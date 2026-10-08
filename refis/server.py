@@ -1,6 +1,10 @@
 """HTTP API + раздача интерфейса."""
+import datetime as dt
 import json
+import mimetypes
 import os
+import random
+import uuid
 import re
 import subprocess
 import sys
@@ -17,6 +21,11 @@ from pydantic import BaseModel
 from . import db, media
 
 STATIC = Path(__file__).resolve().parent / "static"
+
+# Реестр Windows иногда отдаёт .js как text/plain — тогда ES-модули не грузятся.
+mimetypes.add_type("text/javascript", ".js")
+mimetypes.add_type("text/css", ".css")
+mimetypes.add_type("image/svg+xml", ".svg")
 
 @asynccontextmanager
 async def lifespan(_app):
@@ -349,14 +358,17 @@ def _path_of(mid: int) -> str:
 
 @app.post("/api/media/{mid}/reveal")
 def reveal(mid: int):
-    path = _path_of(mid)
+    _reveal(_path_of(mid))
+    return {"ok": True}
+
+
+def _reveal(path: str) -> None:
     if sys.platform == "win32":
         subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
     elif sys.platform == "darwin":
         subprocess.Popen(["open", "-R", path])
     else:
         subprocess.Popen(["xdg-open", os.path.dirname(path)])
-    return {"ok": True}
 
 
 @app.post("/api/media/{mid}/open")
@@ -472,6 +484,239 @@ def add_saved(s: SavedIn):
 def delete_saved(sid: int):
     db.connect().execute("DELETE FROM saved_searches WHERE id = ?", (sid,))
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- просмотры / палитра
+
+@app.post("/api/media/{mid}/viewed")
+def viewed(mid: int):
+    db.connect().execute("UPDATE media SET last_viewed = ?, view_count = view_count + 1 WHERE id = ?",
+                         (time.time(), mid))
+    return {"ok": True}
+
+
+@app.get("/api/media/{mid}/palette")
+def palette(mid: int, n: int = 6):
+    from PIL import Image
+    p = media.thumb_path(mid)
+    if not p.exists():
+        thumb(mid)
+    with Image.open(p) as im:
+        im = im.convert("RGB")
+        im.thumbnail((160, 160))
+        q = im.quantize(colors=24, method=Image.Quantize.MEDIANCUT)
+        pal = q.getpalette()
+        counts = sorted(q.getcolors(), reverse=True)
+        total = im.width * im.height
+    # берём самые частые цвета, пропуская слишком похожие на уже выбранные
+    out: list[dict] = []
+    for cnt, idx in counts:
+        rgb = pal[idx * 3: idx * 3 + 3]
+        near = next((o for o in out if sum((a - b) ** 2 for a, b in zip(o["rgb"], rgb)) < 30 ** 2), None)
+        if near:
+            near["share"] += cnt / total
+            continue
+        out.append({"rgb": rgb, "share": cnt / total})
+        if len(out) >= max(2, min(n, 12)):
+            break
+    return [{"hex": "#%02x%02x%02x" % tuple(o["rgb"]), "share": o["share"]} for o in out]
+
+
+# ---------------------------------------------------------------- «Сегодня»: референс дня и статистика
+
+def _day_seed(day: dt.date | None = None) -> int:
+    return int((day or dt.date.today()).strftime("%Y%m%d"))
+
+
+@app.get("/api/today")
+def today(n: int = 0):
+    """Референс дня: стабилен в течение дня, n>0 — «показать другой»."""
+    conn = db.connect()
+    ids = [r[0] for r in conn.execute(
+        "SELECT id FROM media WHERE missing = 0 AND type = 'image' AND kind = 'ref' ORDER BY id")]
+    if not ids:
+        ids = [r[0] for r in conn.execute("SELECT id FROM media WHERE missing = 0 AND type = 'image' ORDER BY id")]
+    if not ids:
+        return {"media": None}
+    rnd = random.Random(_day_seed() * 1000 + n)
+    return {"media": get_media(conn, rnd.choice(ids))}
+
+
+@app.get("/api/stats")
+def stats():
+    conn = db.connect()
+    c = row_dict(conn.execute(
+        "SELECT COUNT(*) total, COALESCE(SUM(type='video'),0) videos, COALESCE(SUM(favorite),0) favorites,"
+        " COALESCE(SUM(kind='own'),0) own,"
+        " COALESCE(SUM(NOT EXISTS (SELECT 1 FROM media_tags mt WHERE mt.media_id = m.id)),0) untagged"
+        " FROM media m WHERE missing = 0").fetchone())
+    c["tags"] = conn.execute("SELECT COUNT(*) FROM tags").fetchone()[0]
+
+    # практика: тепловая карта за 16 недель, серия дней подряд, минуты за неделю
+    today_ = dt.date.today()
+    start = today_ - dt.timedelta(days=16 * 7 - 1)
+    days: dict[str, dict] = {}
+    for r in conn.execute("SELECT ts, count, seconds FROM practice_log WHERE ts >= ?",
+                          (time.mktime(start.timetuple()),)):
+        d = dt.date.fromtimestamp(r["ts"]).isoformat()
+        e = days.setdefault(d, {"count": 0, "seconds": 0})
+        e["count"] += r["count"]
+        e["seconds"] += r["seconds"]
+    streak, d = 0, today_
+    if d.isoformat() not in days:
+        d -= dt.timedelta(days=1)  # сегодня ещё можно успеть — серия не прерывается
+    while d.isoformat() in days:
+        streak += 1
+        d -= dt.timedelta(days=1)
+    week = sum(v["seconds"] for k, v in days.items() if dt.date.fromisoformat(k) > today_ - dt.timedelta(days=7))
+    c["practice"] = {"days": days, "streak": streak, "week_minutes": round(week / 60),
+                     "total_sessions": conn.execute("SELECT COUNT(*) FROM practice_log").fetchone()[0],
+                     "start": start.isoformat()}
+
+    cols = ("SELECT m.id, m.name, m.ext, m.type, m.kind, m.width, m.height, m.duration, m.rating, m.favorite,"
+            " m.thumb_state FROM media m WHERE m.missing = 0 ")
+    c["recent"] = [row_dict(r) for r in conn.execute(cols + "ORDER BY added_at DESC LIMIT 14")]
+    month_ago = time.time() - 30 * 86400
+    c["forgotten"] = [row_dict(r) for r in conn.execute(
+        cols + "AND m.type = 'image' AND (m.last_viewed IS NULL OR m.last_viewed < ?) "
+        "ORDER BY (m.favorite * 3 + m.rating) DESC, random() LIMIT 10", (month_ago,))]
+    c["top_tags"] = [row_dict(r) for r in conn.execute(
+        "SELECT t.name, COUNT(*) count FROM tags t JOIN media_tags mt ON mt.tag_id = t.id "
+        "GROUP BY t.id ORDER BY count DESC LIMIT 30")]
+    return c
+
+
+class PracticeIn(BaseModel):
+    kind: str = "gesture"
+    count: int = 0
+    seconds: float = 0
+    prompt: str = ""
+    media_id: int | None = None
+
+
+@app.post("/api/practice")
+def log_practice(p: PracticeIn):
+    db.connect().execute(
+        "INSERT INTO practice_log(ts, kind, count, seconds, prompt, media_id) VALUES (?,?,?,?,?,?)",
+        (time.time(), p.kind, p.count, p.seconds, p.prompt, p.media_id))
+    return {"ok": True}
+
+
+@app.get("/api/practice")
+def practice_history(limit: int = 30):
+    return [row_dict(r) for r in db.connect().execute(
+        "SELECT * FROM practice_log ORDER BY ts DESC LIMIT ?", (limit,))]
+
+
+# ---------------------------------------------------------------- доски референсов
+
+class BoardIn(BaseModel):
+    name: str | None = None
+    data: dict | None = None
+
+
+def _board_preview(data: dict) -> list[str]:
+    items = [i for i in data.get("items", []) if i.get("type") in ("media", "asset")]
+    items.sort(key=lambda i: -(i.get("w", 0) * i.get("h", 0)))
+    return [i["src"] for i in items[:4] if i.get("src")]
+
+
+@app.get("/api/boards")
+def boards():
+    out = []
+    for r in db.connect().execute("SELECT * FROM boards ORDER BY updated_at DESC"):
+        data = json.loads(r["data"])
+        out.append({"id": r["id"], "name": r["name"], "updated_at": r["updated_at"],
+                    "count": len(data.get("items", [])), "preview": _board_preview(data)})
+    return out
+
+
+@app.post("/api/boards")
+def create_board(b: BoardIn):
+    now = time.time()
+    data = json.dumps(b.data or {"items": []}, ensure_ascii=False)
+    bid = db.connect().execute("INSERT INTO boards(name, data, created_at, updated_at) VALUES (?,?,?,?)",
+                               ((b.name or "Новая доска").strip(), data, now, now)).lastrowid
+    return {"id": bid}
+
+
+@app.get("/api/boards/{bid}")
+def get_board(bid: int):
+    r = db.connect().execute("SELECT * FROM boards WHERE id = ?", (bid,)).fetchone()
+    if not r:
+        raise HTTPException(404, "Доска не найдена")
+    return {"id": r["id"], "name": r["name"], "data": json.loads(r["data"]), "updated_at": r["updated_at"]}
+
+
+@app.put("/api/boards/{bid}")
+def save_board(bid: int, b: BoardIn):
+    conn = db.connect()
+    if b.name is not None:
+        conn.execute("UPDATE boards SET name = ?, updated_at = ? WHERE id = ?", (b.name.strip() or "Доска", time.time(), bid))
+    if b.data is not None:
+        conn.execute("UPDATE boards SET data = ?, updated_at = ? WHERE id = ?",
+                     (json.dumps(b.data, ensure_ascii=False), time.time(), bid))
+    return {"ok": True}
+
+
+@app.delete("/api/boards/{bid}")
+def delete_board(bid: int):
+    db.connect().execute("DELETE FROM boards WHERE id = ?", (bid,))
+    return {"ok": True}
+
+
+def _pictures_dir() -> Path:
+    home = Path.home()
+    for name in ("Pictures", "Изображения"):
+        if (home / name).is_dir():
+            return home / name / "Refis"
+    return db.DATA_DIR / "exports"
+
+
+@app.post("/api/boards/{bid}/export")
+def export_board(bid: int, file: UploadFile = File(...)):
+    out_dir = _pictures_dir()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    base = _safe_name(os.path.splitext(file.filename or "доска")[0]) or "доска"
+    target, n = out_dir / f"{base}.png", 1
+    while target.exists():
+        target = out_dir / f"{base} ({n}).png"; n += 1
+    with open(target, "wb") as out:
+        while chunk := file.file.read(1 << 20):
+            out.write(chunk)
+    return {"path": str(target)}
+
+
+@app.post("/api/boards/{bid}/reveal-export")
+def reveal_export(bid: int, path: str):
+    p = Path(path).resolve()
+    if p.parent != _pictures_dir().resolve() or not p.exists():
+        raise HTTPException(400)
+    _reveal(str(p))
+    return {"ok": True}
+
+
+_ASSET_RE = re.compile(r"^[0-9a-f]{32}\.(png|jpe?g|gif|webp|bmp)$")
+
+
+@app.post("/api/board-assets")
+def upload_asset(file: UploadFile = File(...)):
+    """Картинки, вставленные на доску из буфера обмена или перетащенные из браузера."""
+    ext = os.path.splitext(file.filename or "")[1].lower().lstrip(".") or "png"
+    if ext not in ("png", "jpg", "jpeg", "gif", "webp", "bmp"):
+        ext = "png"
+    name = f"{uuid.uuid4().hex}.{ext}"
+    with open(db.ASSET_DIR / name, "wb") as out:
+        while chunk := file.file.read(1 << 20):
+            out.write(chunk)
+    return {"src": f"/api/board-assets/{name}"}
+
+
+@app.get("/api/board-assets/{name}")
+def get_asset(name: str):
+    if not _ASSET_RE.match(name) or not (db.ASSET_DIR / name).exists():
+        raise HTTPException(404)
+    return FileResponse(db.ASSET_DIR / name, headers={"Cache-Control": "max-age=31536000, immutable"})
 
 
 app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")

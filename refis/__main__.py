@@ -49,6 +49,31 @@ class JsApi:
         res = self._window.create_file_dialog(webview.FOLDER_DIALOG)
         return res[0] if res else None
 
+    def set_on_top(self, value):
+        self._window.on_top = bool(value)
+        return bool(value)
+
+    def toggle_fullscreen(self):
+        self._window.toggle_fullscreen()
+
+
+def selftest(url: str) -> int:
+    """Проверка собранной программы (используется в CI): сервер, интерфейс, ffmpeg."""
+    from . import media
+    wait_ready(url)
+    try:
+        for path in ("/api/status", "/", "/js/main.js", "/css/style.css", "/api/stats"):
+            with urllib.request.urlopen(url + path, timeout=10) as r:
+                assert r.status == 200, path
+                if path.endswith(".js"):
+                    assert "javascript" in r.headers.get("Content-Type", ""), r.headers.get("Content-Type")
+        assert media.ffmpeg_exe(), "ffmpeg не найден"
+        print("SELFTEST OK")
+        return 0
+    except Exception as e:
+        print("SELFTEST FAILED:", repr(e))
+        return 1
+
 
 def main() -> None:
     port = int(os.environ.get("REFIS_PORT") or free_port())
@@ -56,6 +81,15 @@ def main() -> None:
     from .server import app
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_config=None, log_level="warning")
     server = uvicorn.Server(config)
+
+    if "--selftest" in sys.argv:
+        threading.Thread(target=server.run, daemon=True).start()
+        code = selftest(url)
+        log.info("selftest: %s", "OK" if code == 0 else "FAILED")
+        (db.DATA_DIR / "selftest.txt").write_text(str(code))
+        if sys.stdout:
+            sys.stdout.flush()
+        os._exit(code)
 
     if "--browser" in sys.argv:
         threading.Thread(target=lambda: (wait_ready(url), webbrowser.open(url)), daemon=True).start()
@@ -74,7 +108,7 @@ def main() -> None:
     wait_ready(url)
     api = JsApi()
     api._window = webview.create_window("Refis", url, js_api=api, width=1500, height=950,
-                                       min_size=(900, 600), background_color="#16171b")
+                                       min_size=(900, 600), background_color="#0c0c10")
     try:
         webview.start(private_mode=False, storage_path=str(db.DATA_DIR / "webview"))
     except Exception as e:

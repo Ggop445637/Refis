@@ -1,0 +1,246 @@
+// Точка входа: навигация, командная палитра, горячие клавиши, вставка/перетаскивание, статус.
+import { $, $$, api, esc, store, toast, on, emit, transition, isTyping, clipboardImages, modalOpen, closeModal, files } from "./util.js";
+import {
+  state as lib, initLibrary, load, loadTags, loadFolders, loadSaved, libraryKey, uploadDialog, folderDialog,
+  applyQuery, toggleTag, toggleDetails, filterParams, layout,
+} from "./library.js";
+import { viewerOpen, viewerKey } from "./viewer.js";
+import { practiceOpen, practiceKey, practiceDialog } from "./practice.js";
+import { renderToday, startChallenge } from "./today.js";
+import { renderBoards, openBoard, createBoard, boardKey, boardPaste, boardDrop, boardActive, leaveBoard } from "./boards.js";
+
+let page = null;
+let libLoaded = false;
+
+// ======================================================================= навигация
+
+function movePill(navSel) {
+  const nav = $(navSel);
+  const pill = $(".pill", nav);
+  const active = $("button.active", nav);
+  if (!active || (navSel === "#views" && page !== "library")) { pill.style.opacity = 0; return; }
+  pill.style.opacity = 1;
+  pill.style.transform = `translateY(${active.offsetTop}px)`;
+  pill.style.height = active.offsetHeight + "px";
+}
+on("pill", (sel) => requestAnimationFrame(() => movePill(sel)));
+
+export function go(p) {
+  if (p === page) return;
+  const prev = page;
+  if (prev === "board") leaveBoard();
+  const swap = () => {
+    page = p;
+    $$(".page").forEach((el) => el.classList.toggle("active", el.dataset.page === p));
+    const navPage = p === "board" ? "boards" : p;
+    $$("#mainNav button").forEach((b) => b.classList.toggle("active", b.dataset.page === navPage));
+    movePill("#mainNav");
+    movePill("#views");
+    if (!document.startViewTransition) {
+      const el = $(`.page[data-page="${p}"]`);
+      el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter");
+    }
+  };
+  transition(swap);
+  if (p !== "board") store("page", p);
+  if (p === "today") renderToday();
+  if (p === "boards") renderBoards();
+  if (p === "library") {
+    if (!libLoaded) { libLoaded = true; load(); }
+    else requestAnimationFrame(layout);
+  }
+}
+on("navigate", go);
+
+$("#mainNav").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-page]");
+  if (b) go(b.dataset.page);
+});
+
+// ======================================================================= статус сканирования
+
+let pollTimer = null, wasBusy = false;
+async function poll() {
+  clearTimeout(pollTimer);
+  const s = await api("/status").catch(() => null);
+  if (!s) { pollTimer = setTimeout(poll, 5000); return; }
+  $('[data-count="all"]').textContent = s.total - (s.missing || 0) || "";
+  const busy = s.scan.running || s.thumbs_pending > 0;
+  let text = "";
+  if (s.scan.running) text = `Сканирую… новых: ${s.scan.added}`;
+  else if (s.thumbs_pending) text = `Создаю превью… осталось ${s.thumbs_pending}`;
+  if (!s.ffmpeg) text += (text ? " · " : "") + "ffmpeg не найден — нет превью видео";
+  const st = $("#scanText");
+  st.textContent = text;
+  st.className = busy ? "scanning" : "";
+  if (busy) {
+    pollTimer = setTimeout(poll, 1500);
+    if (s.scan.running && page === "library" && !lib.selected.size && $("#gridwrap").scrollTop < 50) { loadFolders(); load(); }
+  }
+  if (wasBusy && !busy) {
+    loadFolders(); loadTags();
+    if (page === "library") load();
+    if (page === "today") renderToday();
+  }
+  if (!busy) pollTimer = setTimeout(poll, 15000);
+  wasBusy = busy;
+}
+on("poll", poll);
+
+// ======================================================================= поверх окон
+
+let pinned = false;
+async function togglePin() {
+  if (!window.pywebview?.api?.set_on_top) return toast("Доступно только в приложении");
+  pinned = await window.pywebview.api.set_on_top(!pinned);
+  $("#pinBtn").classList.toggle("on", pinned);
+  $("#bPin")?.classList.toggle("on", pinned);
+  toast(pinned ? "📌 Окно поверх остальных" : "Окно больше не поверх остальных", { life: 1600 });
+}
+on("toggle-pin", togglePin);
+$("#pinBtn").onclick = togglePin;
+addEventListener("pywebviewready", () => { $("#pinBtn").hidden = false; const b = $("#bPin"); if (b) b.hidden = false; });
+
+// ======================================================================= командная палитра
+
+function commands() {
+  const list = [
+    { g: "Переход", ic: "☀", t: "Сегодня", run: () => go("today"), k: "Ctrl 1" },
+    { g: "Переход", ic: "▦", t: "Библиотека", run: () => go("library"), k: "Ctrl 2" },
+    { g: "Переход", ic: "◫", t: "Доски", run: () => go("boards"), k: "Ctrl 3" },
+    { g: "Действия", ic: "🎲", t: "Нарисуй это — случайное задание", run: () => startChallenge(null, true) },
+    { g: "Действия", ic: "⏱", t: "Тренировка набросков", run: () => { go("library"); practiceDialog({ params: filterParams(), total: lib.total }); } },
+    { g: "Действия", ic: "◫", t: "Новая доска", run: () => createBoard() },
+    { g: "Действия", ic: "＋", t: "Добавить папку", run: () => folderDialog() },
+    { g: "Действия", ic: "⟳", t: "Пересканировать все папки", run: async () => { await api("/scan", { method: "POST" }); poll(); toast("Сканирую…"); } },
+    { g: "Действия", ic: "◨", t: "Показать/скрыть панель деталей", run: () => { go("library"); toggleDetails(); }, k: "I" },
+    { g: "Действия", ic: "📌", t: "Окно поверх всех окон", run: togglePin },
+    { g: "Действия", ic: "✨", t: "Вкл/выкл фоновую анимацию", run: () => { document.body.classList.toggle("perf"); store("perf", document.body.classList.contains("perf")); } },
+    { g: "Библиотека", ic: "★", t: "Избранное", run: () => { go("library"); applyQuery({ view: "fav" }); } },
+    { g: "Библиотека", ic: "🏷", t: "Файлы без тегов", run: () => { go("library"); applyQuery({ view: "untagged" }); } },
+    { g: "Библиотека", ic: "⧉", t: "Дубликаты", run: () => { go("library"); applyQuery({ view: "dupes" }); } },
+    { g: "Библиотека", ic: "▶", t: "Только видео", run: () => { go("library"); applyQuery({ type: "video" }); } },
+    { g: "Библиотека", ic: "🔀", t: "Случайный порядок", run: () => { go("library"); const { view, folder, tags, ntags, q, type, orient, minRating } = lib; applyQuery({ view, folder, tags, ntags, q, type, orient, minRating, sort: "random" }); } },
+  ];
+  (lib.saved || []).forEach((s) => list.push({ g: "Сохранённые поиски", ic: "☆", t: s.name, run: () => { go("library"); applyQuery(s.query); } }));
+  (paletteBoards || []).forEach((b) => list.push({ g: "Доски", ic: "◫", t: b.name, run: () => openBoard(b.id) }));
+  lib.allTags.forEach((t) => list.push({ g: "Теги", ic: "#", t: t.name, sub: t.count, run: () => { lib.tags = []; lib.ntags = []; toggleTag(t.name); } }));
+  return list;
+}
+let paletteBoards = [];
+
+function score(q, t) {
+  if (!q) return 1;
+  t = t.toLowerCase();
+  const i = t.indexOf(q);
+  if (i >= 0) return 100 - i;
+  let j = 0, s = 0;
+  for (const ch of t) { if (ch === q[j]) { j++; s++; } if (j === q.length) break; }
+  return j === q.length ? s : 0;
+}
+function highlight(q, t) {
+  const i = t.toLowerCase().indexOf(q);
+  if (!q || i < 0) return esc(t);
+  return esc(t.slice(0, i)) + "<b>" + esc(t.slice(i, i + q.length)) + "</b>" + esc(t.slice(i + q.length));
+}
+
+async function openPalette() {
+  const p = $("#palette");
+  if (!p.hidden) return closePalette();
+  api("/boards").then((b) => (paletteBoards = b)).catch(() => {});
+  p.innerHTML = `<div class="pal"><input id="palIn" placeholder="Что сделать? Поиск по командам, тегам, доскам…" autocomplete="off"><ul id="palList"></ul></div>`;
+  p.hidden = false;
+  let sel = 0, shown = [];
+  const draw = () => {
+    const q = $("#palIn").value.trim().toLowerCase();
+    shown = commands().map((c) => ({ c, s: score(q, c.t) })).filter((x) => x.s > 0)
+      .sort((a, b) => (q ? b.s - a.s : 0)).slice(0, 40).map((x) => x.c);
+    sel = Math.min(sel, Math.max(0, shown.length - 1));
+    let g = null;
+    $("#palList").innerHTML = shown.map((c, i) => {
+      const head = !q && c.g !== g ? `<div class="group">${esc((g = c.g))}</div>` : "";
+      return `${head}<li data-i="${i}" class="${i === sel ? "on" : ""}"><span class="ic">${c.ic}</span><span>${highlight(q, c.t)}</span>${c.k ? `<kbd class="sub">${c.k}</kbd>` : c.sub ? `<span class="sub">${c.sub}</span>` : ""}</li>`;
+    }).join("") || `<li class="muted">Ничего не найдено</li>`;
+    $("#palList li.on")?.scrollIntoView({ block: "nearest" });
+  };
+  const run = (i) => { const c = shown[i]; closePalette(); c?.run(); };
+  $("#palIn").oninput = () => { sel = 0; draw(); };
+  $("#palIn").onkeydown = (e) => {
+    if (e.key === "ArrowDown") { sel = Math.min(shown.length - 1, sel + 1); draw(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { sel = Math.max(0, sel - 1); draw(); e.preventDefault(); }
+    else if (e.key === "Enter") run(sel);
+    else if (e.key === "Escape") closePalette();
+  };
+  $("#palList").onclick = (e) => { const li = e.target.closest("li[data-i]"); if (li) run(+li.dataset.i); };
+  p.onpointerdown = (e) => { if (e.target === p) closePalette(); };
+  draw();
+  setTimeout(() => $("#palIn").focus(), 10);
+}
+function closePalette() { $("#palette").hidden = true; }
+$("#cmdkBtn").onclick = openPalette;
+
+// ======================================================================= клавиатура
+
+addEventListener("keydown", (e) => {
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const ctrl = e.ctrlKey || e.metaKey;
+  if (ctrl && (k === "k" || k === "л")) { e.preventDefault(); openPalette(); return; }
+  if (!$("#palette").hidden) return;
+  if (modalOpen()) { if (k === "Escape") closeModal(); return; }
+  if (practiceOpen()) { e.preventDefault(); practiceKey(e); return; }
+  if (viewerOpen()) { if (!isTyping(e)) { e.preventDefault(); viewerKey(e); } return; }
+  if (ctrl && ["1", "2", "3"].includes(k)) { e.preventDefault(); go({ 1: "today", 2: "library", 3: "boards" }[k]); return; }
+  if ((ctrl && (k === "f" || k === "а")) || (k === "/" && !isTyping(e))) {
+    e.preventDefault(); go("library"); setTimeout(() => $("#search").focus(), 30); return;
+  }
+  if (isTyping(e)) { if (k === "Escape") e.target.blur(); return; }
+  if (page === "board" && boardKey(e)) { e.preventDefault(); return; }
+  if (page === "library" && libraryKey(e)) { e.preventDefault(); return; }
+});
+
+// ======================================================================= вставка и перетаскивание
+
+addEventListener("paste", (e) => {
+  const imgs = clipboardImages(e);
+  if (!imgs.length) return;
+  if (isTyping(e) && !e.target.closest(".tagedit")) return;
+  e.preventDefault();
+  if (boardPaste(e)) return;
+  uploadDialog(imgs);
+});
+
+let dragDepth = 0;
+const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
+addEventListener("dragenter", (e) => {
+  if (!hasFiles(e) || page === "board") return;
+  dragDepth++;
+  $("#dropzone").hidden = false;
+});
+addEventListener("dragleave", (e) => {
+  if (!hasFiles(e) || page === "board") return;
+  if (--dragDepth <= 0) { dragDepth = 0; $("#dropzone").hidden = true; }
+});
+addEventListener("dragover", (e) => { if (hasFiles(e)) e.preventDefault(); });
+addEventListener("drop", (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  $("#dropzone").hidden = true;
+  if (page === "board") return boardDrop(e);
+  const list = [...e.dataTransfer.files].filter((f) => /\.(jpe?g|jfif|png|gif|webp|bmp|tiff?|psd|mp4|webm|mov|m4v|mkv|avi|wmv|flv|mpe?g)$/i.test(f.name));
+  if (!list.length) return toast("Здесь нет картинок или видео");
+  uploadDialog(list);
+});
+
+addEventListener("resize", () => { movePill("#mainNav"); movePill("#views"); });
+
+// ======================================================================= старт
+
+(async function init() {
+  if (store("perf")) document.body.classList.add("perf");
+  initLibrary();
+  await Promise.all([loadFolders(), loadTags(), loadSaved()]).catch(() => {});
+  go(store("page") || "today");
+  requestAnimationFrame(() => { movePill("#mainNav"); movePill("#views"); });
+  poll();
+})();

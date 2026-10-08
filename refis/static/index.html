@@ -1,134 +1,191 @@
 <!doctype html>
 <html lang="ru">
 <head>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%224%22 fill=%22%23e0a35a%22/%3E%3C/svg%3E">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="view-transition" content="same-origin">
 <title>Refis</title>
-<link rel="stylesheet" href="style.css">
+<link rel="icon" href="img/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffc371"/><stop offset=".55" stop-color="#ff6b6b"/><stop offset="1" stop-color="#7c5cff"/>
+    </linearGradient>
+  </defs>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+  <symbol id="i-board" viewBox="0 0 24 24"><rect x="2.5" y="4" width="11" height="9" rx="1.5" transform="rotate(-6 8 8.5)"/><rect x="10" y="9" width="11.5" height="10" rx="1.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3H7l3-3z"/><path d="M12 13v7"/></symbol>
+  <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></symbol>
+  <symbol id="i-dice" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
+  <symbol id="i-cmd" viewBox="0 0 24 24"><path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3z"/></symbol>
+</svg>
+
+<div class="ambient"><i></i><i></i><i></i></div>
+
 <div id="app">
   <aside id="sidebar">
-    <div class="brand">Refis</div>
-    <nav id="views">
-      <button data-view="all" class="active">Все файлы <span data-count="all"></span></button>
+    <div class="brand"><img src="img/logo.svg" alt=""><b>Refis</b></div>
+
+    <nav class="nav" id="mainNav">
+      <div class="pill"></div>
+      <button data-page="today"><svg class="i"><use href="#i-sun"/></svg>Сегодня</button>
+      <button data-page="library"><svg class="i"><use href="#i-grid"/></svg>Библиотека<span class="cnt" data-count="all"></span></button>
+      <button data-page="boards"><svg class="i"><use href="#i-board"/></svg>Доски</button>
+    </nav>
+
+    <nav class="nav sub" id="views">
+      <div class="pill"></div>
+      <button data-view="all">Все файлы</button>
       <button data-view="ref"><i class="dot k-ref"></i>Референсы</button>
       <button data-view="own"><i class="dot k-own"></i>Мои работы</button>
       <button data-view="tutorial"><i class="dot k-tutorial"></i>Туториалы</button>
       <button data-view="other"><i class="dot k-other"></i>Прочее</button>
-      <hr>
       <button data-view="fav">★ Избранное</button>
       <button data-view="untagged">Без тегов</button>
       <button data-view="dupes">Дубликаты</button>
-      <button data-view="missing">Пропавшие файлы</button>
+      <button data-view="missing">Пропавшие</button>
     </nav>
 
-    <section>
-      <h3>Сохранённые поиски</h3>
-      <ul id="saved" class="list"></ul>
+    <section class="sb-section">
+      <h3>Сохранённые</h3>
+      <ul id="savedlist" class="list"></ul>
     </section>
 
-    <section class="grow">
-      <h3>Теги <input id="tagFilter" placeholder="найти тег"></h3>
-      <p class="hint">Клик — показать, Alt+клик — исключить, ПКМ — переименовать/удалить</p>
+    <section class="sb-section grow">
+      <h3>Теги <input id="tagFilter" placeholder="найти…"></h3>
       <ul id="taglist" class="list"></ul>
     </section>
 
-    <section>
-      <h3>Папки <button id="addFolder" class="mini" title="Добавить папку">＋</button></h3>
+    <section class="sb-section">
+      <h3>Папки <button id="addFolder" class="mini ghost" title="Добавить папку">＋</button></h3>
       <ul id="folderlist" class="list"></ul>
     </section>
+
+    <div class="sb-foot">
+      <button class="cmdk" id="cmdkBtn" title="Командная панель"><span>Команды</span><kbd>Ctrl K</kbd></button>
+      <button class="icon" id="pinBtn" title="Поверх всех окон" hidden><svg class="i"><use href="#i-pin"/></svg></button>
+    </div>
   </aside>
 
-  <main>
-    <header id="toolbar">
-      <div class="searchbox">
-        <input id="search" type="search" placeholder='Поиск: слова, #тег, -#исключить, -слово' autocomplete="off">
-      </div>
-      <select id="fType" title="Тип файла">
-        <option value="">Фото и видео</option>
-        <option value="image">Только фото</option>
-        <option value="video">Только видео</option>
-      </select>
-      <select id="fOrient" title="Ориентация">
-        <option value="">Любая ориентация</option>
-        <option value="portrait">Вертикальные</option>
-        <option value="landscape">Горизонтальные</option>
-        <option value="square">Квадратные</option>
-      </select>
-      <select id="fRating" title="Рейтинг">
-        <option value="0">Любой рейтинг</option>
-        <option value="1">★ 1+</option>
-        <option value="3">★ 3+</option>
-        <option value="5">★ 5</option>
-      </select>
-      <select id="fSort" title="Сортировка">
-        <option value="new">Сначала новые</option>
-        <option value="old">Сначала старые</option>
-        <option value="mtime">По дате файла</option>
-        <option value="name">По имени</option>
-        <option value="rating">По рейтингу</option>
-        <option value="size">По размеру</option>
-        <option value="duration">По длительности</option>
-        <option value="random">Случайно</option>
-      </select>
-      <input id="thumbSize" type="range" min="110" max="420" value="200" title="Размер превью">
-      <button id="fitToggle" class="ghost" title="Превью: обрезать / целиком">▣</button>
-      <button id="saveSearch" class="ghost" title="Сохранить текущий поиск">☆ Сохранить</button>
-      <button id="practiceBtn" title="Тренировка набросков по текущей подборке">⏱ Тренировка</button>
-    </header>
-    <div id="chips"></div>
-    <div id="statusbar"><span id="countText"></span><span id="scanText"></span></div>
-    <div id="gridwrap">
-      <div id="grid"></div>
-      <div id="sentinel"></div>
-      <div id="empty" hidden></div>
-    </div>
-  </main>
+  <main id="main">
+    <!-- СЕГОДНЯ -->
+    <section class="page" data-page="today"><div class="today" id="today"></div></section>
 
-  <aside id="details"></aside>
+    <!-- БИБЛИОТЕКА -->
+    <section class="page" data-page="library">
+      <div class="lib-main">
+        <header class="toolbar">
+          <div class="searchbox">
+            <svg class="i"><use href="#i-search"/></svg>
+            <input id="search" type="search" placeholder="Поиск: слова, #тег, -#исключить" autocomplete="off">
+            <kbd>Ctrl F</kbd>
+          </div>
+          <div class="seg" id="fType">
+            <button data-v="" class="on">Всё</button><button data-v="image">Фото</button><button data-v="video">Видео</button>
+          </div>
+          <select id="fOrient" title="Ориентация">
+            <option value="">Любая форма</option>
+            <option value="portrait">Вертикальные</option>
+            <option value="landscape">Горизонтальные</option>
+            <option value="square">Квадратные</option>
+          </select>
+          <select id="fRating" title="Оценка">
+            <option value="0">Любая оценка</option>
+            <option value="1">★ 1+</option>
+            <option value="3">★ 3+</option>
+            <option value="5">★ 5</option>
+          </select>
+          <select id="fSort" title="Сортировка">
+            <option value="new">Сначала новые</option>
+            <option value="old">Сначала старые</option>
+            <option value="mtime">По дате файла</option>
+            <option value="name">По имени</option>
+            <option value="rating">По оценке</option>
+            <option value="size">По размеру</option>
+            <option value="duration">По длительности</option>
+            <option value="random">Перемешать</option>
+          </select>
+          <div class="seg" id="layoutSeg" title="Вид сетки">
+            <button data-v="justified" title="Плитка — без обрезки">▤</button><button data-v="grid" title="Квадраты">▦</button>
+          </div>
+          <input id="thumbSize" type="range" min="120" max="440" value="220" title="Размер превью">
+          <button id="saveSearch" class="ghost" title="Сохранить текущий поиск"><svg class="i"><use href="#i-star"/></svg></button>
+          <button id="practiceBtn" title="Тренировка набросков по подборке"><svg class="i"><use href="#i-timer"/></svg>Тренировка</button>
+          <button id="detailsToggle" class="icon ghost" title="Панель деталей (I)"><svg class="i"><use href="#i-panel"/></svg></button>
+        </header>
+        <div id="chips"></div>
+        <div class="statusbar"><span id="countText"></span><span id="scanText"></span></div>
+        <div id="gridwrap">
+          <div id="grid"></div>
+          <div id="sentinel"></div>
+          <div id="empty" hidden></div>
+        </div>
+      </div>
+      <aside id="details"></aside>
+    </section>
+
+    <!-- ДОСКИ -->
+    <section class="page" data-page="boards"><div class="boards" id="boards"></div></section>
+    <section class="page" data-page="board" id="boardPage"></section>
+  </main>
 </div>
 
+<!-- ПРОСМОТР -->
 <div id="viewer" class="overlay" hidden>
-  <div class="vtop">
-    <span id="vTitle"></span>
+  <div class="vtop chrome">
+    <div class="vtitle" id="vTitle"></div>
     <div class="vtools">
-      <button data-act="mirror" title="Отзеркалить (H)">⇋ Зеркало</button>
+      <button data-act="mirror" title="Отзеркалить (H)">⇋</button>
       <button data-act="gray" title="Чёрно-белое (G)">Ч/Б</button>
-      <button data-act="blur" title="Размытие для тонового разбора (B)">◍ Пятна</button>
-      <button data-act="fit" title="Вписать (0)">⤢</button>
+      <button data-act="blur" title="Размытие — тоновые пятна (B)">Пятна</button>
+      <button data-act="grid" title="Сетка пропорций (S)">#</button>
+      <button data-act="rotate" title="Повернуть (R)">⟳</button>
+      <button data-act="pick" title="Пипетка — взять цвет (I)" id="pickBtn">Пипетка</button>
+      <button data-act="copy" title="Копировать картинку (Ctrl+C)">Копир.</button>
       <span class="vsep vid-only"></span>
-      <button data-act="back" class="vid-only" title="Кадр назад (,)">⏮︎ кадр</button>
-      <button data-act="fwd" class="vid-only" title="Кадр вперёд (.)">кадр ⏭︎</button>
+      <button data-act="back" class="vid-only" title="Кадр назад (,)">⏮</button>
+      <button data-act="fwd" class="vid-only" title="Кадр вперёд (.)">⏭</button>
       <select id="vSpeed" class="vid-only" title="Скорость ([ ])">
         <option value="0.1">0.1×</option><option value="0.25">0.25×</option><option value="0.5">0.5×</option>
-        <option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option>
-        <option value="2">2×</option>
+        <option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option>
       </select>
-      <button data-act="loop" class="vid-only" title="Повтор (L)">↻ Повтор</button>
+      <button data-act="loop" class="vid-only" title="Повтор (L)">↻</button>
       <span class="vsep"></span>
       <button data-act="fav" title="В избранное (F)">☆</button>
+      <button data-act="board" title="На доску">＋ Доска</button>
       <button data-act="close" title="Закрыть (Esc)">✕</button>
     </div>
   </div>
-  <div id="vStage" class="stage"></div>
-  <div id="vBar" class="vid-only">
+  <div class="stage" id="vStage"></div>
+  <div class="zoomind" id="zoomInd"></div>
+  <div class="vpalette chrome swatches" id="vPalette"></div>
+  <div class="vbar chrome vid-only">
     <button id="vPlay" title="Пауза (Пробел)">❚❚</button>
-    <input id="vSeek" type="range" min="0" max="1000" value="0">
+    <input id="vSeek" type="range" min="0" max="1000" value="0" step="1">
     <span id="vTime">0:00 / 0:00</span>
-    <button id="vMute" title="Звук">🔊</button>
+    <button id="vMute" title="Звук (M)">🔊</button>
   </div>
-  <button class="vnav prev" data-act="prev" title="Назад (←)">‹</button>
-  <button class="vnav next" data-act="next" title="Вперёд (→)">›</button>
+  <button class="vnav prev chrome" data-act="prev" title="Назад (←)">‹</button>
+  <button class="vnav next chrome" data-act="next" title="Вперёд (→)">›</button>
 </div>
 
+<!-- ТРЕНИРОВКА -->
 <div id="practice" class="overlay" hidden>
   <div class="stage" id="pStage"></div>
-  <div class="pbar"><div id="pProgress"></div></div>
   <div class="pcontrols">
     <span id="pCounter"></span>
-    <span id="pTime" class="ptime"></span>
+    <div class="pring" id="pRing">
+      <svg viewBox="0 0 60 60"><circle class="track" cx="30" cy="30" r="26"/><circle class="bar" id="pBar" cx="30" cy="30" r="26"/></svg>
+      <span id="pTime"></span>
+    </div>
     <button data-p="prev" title="Назад (←)">‹</button>
     <button data-p="pause" title="Пауза (Пробел)">❚❚</button>
     <button data-p="next" title="Дальше (→)">›</button>
@@ -139,11 +196,12 @@
 </div>
 
 <div id="modal" class="overlay modal" hidden><div class="mbox"></div></div>
-<div id="dropzone" hidden><div>Отпустите файлы, чтобы добавить их в библиотеку</div></div>
+<div id="palette" class="overlay" hidden></div>
+<div id="dropzone" hidden><div>Отпустите, чтобы добавить</div></div>
 <div id="ctxmenu" hidden></div>
-<div id="toast"></div>
+<div id="toasts"></div>
 <datalist id="tagOptions"></datalist>
 
-<script src="app.js"></script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>

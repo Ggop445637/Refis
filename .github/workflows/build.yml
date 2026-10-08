@@ -1,0 +1,74 @@
+name: Сборка Refis для Windows
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Зависимости
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Версия
+        id: ver
+        shell: pwsh
+        run: |
+          $v = (python -c "import refis; print(refis.__version__)").Trim()
+          if ($env:GITHUB_REF -like "refs/tags/v*") { $v = $env:GITHUB_REF_NAME.TrimStart("v") }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Сборка Refis.exe
+        run: python tools/build_exe.py
+
+      - name: Самопроверка собранной программы
+        shell: pwsh
+        run: |
+          $env:REFIS_DATA = "$env:RUNNER_TEMP\refis-selftest"
+          $p = Start-Process -FilePath "dist\Refis\Refis.exe" -ArgumentList "--selftest" -Wait -PassThru
+          Get-Content "$env:REFIS_DATA\refis.log" -ErrorAction SilentlyContinue
+          Write-Host "exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { exit 1 }
+
+      - name: Установщик (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc "/DAppVersion=${{ steps.ver.outputs.version }}" installer\refis.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Портативный архив
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "dist\Refis\data" | Out-Null
+          Compress-Archive -Path "dist\Refis" -DestinationPath "dist\Refis-portable-${{ steps.ver.outputs.version }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Refis-${{ steps.ver.outputs.version }}-windows
+          path: |
+            dist/Refis-Setup-*.exe
+            dist/Refis-portable-*.zip
+
+      - name: Релиз (для тегов v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Refis-Setup-*.exe
+            dist/Refis-portable-*.zip

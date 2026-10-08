@@ -1,11 +1,26 @@
 """SQLite-хранилище каталога: папки, файлы, теги, сохранённые поиски."""
 import os
 import sqlite3
+import sys
 import threading
 from pathlib import Path
 
-DATA_DIR = Path(os.environ.get("REFIS_DATA") or Path(__file__).resolve().parent.parent / "data")
+
+def _data_dir() -> Path:
+    if os.environ.get("REFIS_DATA"):
+        return Path(os.environ["REFIS_DATA"])
+    if getattr(sys, "frozen", False):
+        # .exe: папка data рядом с программой (портативный режим) или %LOCALAPPDATA%\Refis
+        portable = Path(sys.executable).resolve().parent / "data"
+        if portable.is_dir():
+            return portable
+        return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "Refis"
+    return Path(__file__).resolve().parent.parent / "data"
+
+
+DATA_DIR = _data_dir()
 THUMB_DIR = DATA_DIR / "thumbs"
+ASSET_DIR = DATA_DIR / "board_assets"
 DB_PATH = DATA_DIR / "refis.db"
 
 KINDS = ("ref", "own", "tutorial", "other")
@@ -58,7 +73,30 @@ CREATE TABLE IF NOT EXISTS saved_searches (
     name TEXT NOT NULL,
     query TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS practice_log (
+    id INTEGER PRIMARY KEY,
+    ts REAL NOT NULL,
+    kind TEXT NOT NULL,            -- gesture | challenge
+    count INTEGER NOT NULL DEFAULT 0,
+    seconds REAL NOT NULL DEFAULT 0,
+    prompt TEXT NOT NULL DEFAULT '',
+    media_id INTEGER
+);
+CREATE INDEX IF NOT EXISTS practice_ts ON practice_log(ts);
+CREATE TABLE IF NOT EXISTS boards (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    data TEXT NOT NULL DEFAULT '{"items":[]}',
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
 """
+
+# Колонки, добавленные после первой версии: (таблица, колонка, определение)
+MIGRATIONS = [
+    ("media", "last_viewed", "REAL"),
+    ("media", "view_count", "INTEGER NOT NULL DEFAULT 0"),
+]
 
 _local = threading.local()
 
@@ -78,7 +116,13 @@ def connect() -> sqlite3.Connection:
 def init() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     THUMB_DIR.mkdir(parents=True, exist_ok=True)
-    connect().executescript(SCHEMA)
+    ASSET_DIR.mkdir(parents=True, exist_ok=True)
+    conn = connect()
+    conn.executescript(SCHEMA)
+    for table, col, decl in MIGRATIONS:
+        cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        if col not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
 
 
 def tag_id(conn: sqlite3.Connection, name: str) -> int:
