@@ -240,3 +240,45 @@ class ThumbWorker:
 
 
 thumbs = ThumbWorker()
+
+
+# ---------------------------------------------------------------- добавление файлов извне
+
+def safe_name(name: str) -> str:
+    name = os.path.basename(name.replace("\\", "/"))
+    return re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name).strip(" .") or "file"
+
+
+def target_dir(folder_path: str, subdir: str) -> str:
+    sub = [safe_name(p) for p in re.split(r"[\\/]+", subdir or "") if p.strip(" .")]
+    dest = os.path.join(folder_path, *sub)
+    os.makedirs(dest, exist_ok=True)
+    return dest
+
+
+def unique_path(dest: str, name: str) -> str:
+    base, ext = os.path.splitext(safe_name(name))
+    target, n = os.path.join(dest, base + ext), 1
+    while os.path.exists(target):
+        target = os.path.join(dest, f"{base} ({n}){ext}")
+        n += 1
+    return target
+
+
+def register_file(conn, folder, path: str, kind: str = "", tags=(), source: str = "") -> int | None:
+    """Вносит в каталог файл, уже лежащий в папке библиотеки."""
+    mtype = media_type(path)
+    if not mtype:
+        return None
+    st = os.stat(path)
+    name, ext = os.path.splitext(os.path.basename(path))
+    mid = conn.execute(
+        "INSERT INTO media(folder_id, path, name, ext, type, kind, size, mtime, qhash, source, added_at)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        (folder["id"], path, name, ext.lower().lstrip("."), mtype, kind if kind in db.KINDS else folder["kind"],
+         st.st_size, st.st_mtime, quick_hash(path, st.st_size), source, time.time())).lastrowid
+    for t in tags:
+        t = db.normalize_tag(t)
+        if t:
+            conn.execute("INSERT OR IGNORE INTO media_tags VALUES (?, ?)", (mid, db.tag_id(conn, t)))
+    return mid

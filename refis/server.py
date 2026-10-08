@@ -3,7 +3,6 @@ import datetime as dt
 import json
 import mimetypes
 import os
-import random
 import uuid
 import re
 import subprocess
@@ -18,7 +17,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import db, media
+from . import db, media, organize, pinterest
 
 STATIC = Path(__file__).resolve().parent / "static"
 
@@ -33,6 +32,7 @@ async def lifespan(_app):
     # пересканировать папки в фоне: подхватить новые/удалённые файлы
     threading.Thread(target=media.scan_all, daemon=True).start()
     media.thumbs.kick()
+    pinterest.background_sync()
     yield
 
 
@@ -383,9 +383,7 @@ def open_external(mid: int):
 
 # ---------------------------------------------------------------- upload (drag & drop)
 
-def _safe_name(name: str) -> str:
-    name = os.path.basename(name.replace("\\", "/"))
-    return re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name).strip(" .") or "file"
+_safe_name = media.safe_name
 
 
 @app.post("/api/upload")
@@ -395,33 +393,19 @@ def upload(files: list[UploadFile] = File(...), folder_id: int = Form(...), subd
     folder = conn.execute("SELECT * FROM folders WHERE id = ?", (folder_id,)).fetchone()
     if not folder:
         raise HTTPException(400, "Папка не найдена")
-    sub = [_safe_name(p) for p in re.split(r"[\\/]+", subdir) if p.strip(" .")]
-    dest = os.path.join(folder["path"], *sub)
-    os.makedirs(dest, exist_ok=True)
+    dest = media.target_dir(folder["path"], subdir)
     tag_list = [t for t in (db.normalize_tag(x) for x in tags.split(",")) if t]
     added = []
     for f in files:
-        name = _safe_name(f.filename or "file")
-        mtype = media.media_type(name)
-        if not mtype:
+        if not media.media_type(f.filename or ""):
             continue
-        base, ext = os.path.splitext(name)
-        target, n = os.path.join(dest, name), 1
-        while os.path.exists(target):
-            target = os.path.join(dest, f"{base} ({n}){ext}"); n += 1
+        target = media.unique_path(dest, f.filename or "file")
         with open(target, "wb") as out:
             while chunk := f.file.read(1 << 20):
                 out.write(chunk)
-        st = os.stat(target)
-        mid = conn.execute(
-            "INSERT INTO media(folder_id, path, name, ext, type, kind, size, mtime, qhash, added_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (folder_id, target, os.path.splitext(os.path.basename(target))[0], ext.lower().lstrip("."), mtype,
-             kind if kind in db.KINDS else folder["kind"], st.st_size, st.st_mtime,
-             media.quick_hash(target, st.st_size), time.time())).lastrowid
-        for t in tag_list:
-            conn.execute("INSERT OR IGNORE INTO media_tags VALUES (?, ?)", (mid, db.tag_id(conn, t)))
-        added.append(mid)
+        mid = media.register_file(conn, folder, target, kind, tag_list)
+        if mid:
+            added.append(mid)
     media.thumbs.kick()
     return {"added": added}
 
@@ -524,24 +508,6 @@ def palette(mid: int, n: int = 6):
 
 # ---------------------------------------------------------------- «Сегодня»: референс дня и статистика
 
-def _day_seed(day: dt.date | None = None) -> int:
-    return int((day or dt.date.today()).strftime("%Y%m%d"))
-
-
-@app.get("/api/today")
-def today(n: int = 0):
-    """Референс дня: стабилен в течение дня, n>0 — «показать другой»."""
-    conn = db.connect()
-    ids = [r[0] for r in conn.execute(
-        "SELECT id FROM media WHERE missing = 0 AND type = 'image' AND kind = 'ref' ORDER BY id")]
-    if not ids:
-        ids = [r[0] for r in conn.execute("SELECT id FROM media WHERE missing = 0 AND type = 'image' ORDER BY id")]
-    if not ids:
-        return {"media": None}
-    rnd = random.Random(_day_seed() * 1000 + n)
-    return {"media": get_media(conn, rnd.choice(ids))}
-
-
 @app.get("/api/stats")
 def stats():
     conn = db.connect()
@@ -592,13 +558,15 @@ class PracticeIn(BaseModel):
     seconds: float = 0
     prompt: str = ""
     media_id: int | None = None
+    tag: str = ""
+    ctype: str = ""
 
 
 @app.post("/api/practice")
 def log_practice(p: PracticeIn):
     db.connect().execute(
-        "INSERT INTO practice_log(ts, kind, count, seconds, prompt, media_id) VALUES (?,?,?,?,?,?)",
-        (time.time(), p.kind, p.count, p.seconds, p.prompt, p.media_id))
+        "INSERT INTO practice_log(ts, kind, count, seconds, prompt, media_id, tag, ctype) VALUES (?,?,?,?,?,?,?,?)",
+        (time.time(), p.kind, p.count, p.seconds, p.prompt, p.media_id, db.normalize_tag(p.tag), p.ctype))
     return {"ok": True}
 
 
@@ -719,4 +687,6 @@ def get_asset(name: str):
     return FileResponse(db.ASSET_DIR / name, headers={"Cache-Control": "max-age=31536000, immutable"})
 
 
+app.include_router(organize.router)
+app.include_router(pinterest.router)
 app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")

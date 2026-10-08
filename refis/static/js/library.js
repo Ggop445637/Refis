@@ -759,7 +759,7 @@ function kindOptions(sel) {
   return Object.entries(KINDS).map(([k, v]) => `<option value="${k}"${k === sel ? " selected" : ""}>${v}</option>`).join("");
 }
 
-export function folderDialog() {
+export function folderDialog(onDone = null) {
   const native = !!window.pywebview?.api?.pick_folder;
   modal(`<h2>Добавить папку</h2>
     <p>Refis не копирует и не перемещает файлы, а только запоминает, где они лежат, и строит каталог с превью.</p>
@@ -781,7 +781,7 @@ export function folderDialog() {
         close();
         toast("Папка добавлена — сканирую…");
         await loadFolders();
-        emit("navigate", "library");
+        if (onDone) onDone(); else emit("navigate", "library");
         emit("poll");
       };
     });

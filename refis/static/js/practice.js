@@ -3,48 +3,15 @@ import { $, $$, api, esc, store, toast, modal, fmtDur, fileUrl, confetti, emit, 
 
 const RING = 2 * Math.PI * 26;
 const P = { list: [], i: 0, dur: 60, left: 0, paused: false, timer: null, mirror: false, gray: false,
-  kind: "gesture", prompt: "", startedAt: 0, spent: 0, running: false, mediaId: null };
+  kind: "gesture", prompt: "", startedAt: 0, spent: 0, running: false, mediaId: null, tag: "", ctype: "" };
 
-// ======================================================================= генератор заданий
-
-const SUBJECTS = [
-  "кисть руки, держащую предмет", "стопу в трёх ракурсах", "череп в 3/4", "драпировку на стуле", "персонажа в прыжке",
-  "лицо снизу", "лицо сверху", "старое дерево", "кучевые облака", "уголок своей комнаты", "кошку, которая спит",
-  "натюрморт из трёх предметов", "автопортрет", "человека, сидящего на полу", "бегущую фигуру", "профиль с эмоцией",
-  "руки в жесте «стоп»", "складки рукава", "чашку с отражением", "улицу из окна", "стаю птиц", "дракона на камне",
-  "персонажа с тяжёлой ношей", "двух людей в диалоге", "ухо и шею", "глаза с разными эмоциями", "силуэт города",
-  "лес в тумане", "пару кроссовок", "лошадь в движении", "рыцаря в доспехах", "растение в горшке", "морскую волну",
-  "старика с тростью", "танцора", "ребёнка, играющего на полу", "торс в повороте", "смятый лист бумаги", "свою ладонь",
-];
-const TWISTS = [
-  "при контровом свете", "при свете свечи", "в жёстком свете сверху", "на закате", "ночью, один источник света",
-  "в тумане", "снизу, с сильной перспективой", "сверху, вид с высоты", "в мягком рассеянном свете", "в холодной гамме",
-  "в тёплой гамме", "с драматичными тенями", "в движении", "в ветреную погоду", "под дождём", "в зеркальном отражении",
-  "с рим-лайтом", "в силуэте", "через стекло", "в утреннем свете",
-];
-const RULES = [
-  "только 3 тона", "без ластика", "одной непрерывной линией", "сначала силуэт, потом детали", "не отрывая взгляд от референса",
-  "только крупные формы", "без контурных линий", "левой рукой (или не ведущей)", "только прямые линии", "максимум 20 линий",
-  "только светотень, без линий", "в двух цветах", "широкой кистью", "закончи за отведённое время, без доработок",
-  "начни с самых тёмных пятен", "в квадратном формате", "маркером или ручкой", "сначала простые объёмы: шар, куб, цилиндр",
-];
-const MINUTES = [5, 10, 15, 20, 30, 45];
-
-const pick = (a) => a[Math.floor(Math.random() * a.length)];
-
-/** Новое задание. tags — теги библиотеки (если хочется рисовать «своё»). */
-export function generatePrompt({ tags = [], useTags = false, minutes = 0 } = {}) {
-  const fromTag = useTags && tags.length && Math.random() < 0.7;
-  const tag = fromTag ? pick(tags) : null;
-  return {
-    subject: tag ? tag.split("/").pop() : pick(SUBJECTS),
-    tag,
-    twist: Math.random() < 0.75 ? pick(TWISTS) : "",
-    rule: pick(RULES),
-    minutes: minutes || pick(MINUTES),
-  };
+/** Картинка сессии: id файла библиотеки, {id} или {pin} (пин из Pinterest). */
+function srcOf(x) {
+  if (x == null) return null;
+  if (typeof x === "number") return fileUrl(x);
+  if (x.pin) return `/api/pinterest/pins/${x.pin}/img?full=true`;
+  return fileUrl(x.id);
 }
-export const promptText = (p) => `Нарисуй ${p.tag ? `на тему «${p.subject}»` : p.subject}${p.twist ? " " + p.twist : ""}`;
 
 // ======================================================================= диалог тренировки
 
@@ -103,9 +70,13 @@ export function practiceDialog({ ids = null, params = null, total = 0, single = 
 // ======================================================================= сессия
 
 /** ids — картинки (может быть пусто, если задание без референса), prompt — текст задания. */
-export async function runSession({ ids = [], dur = 60, mirror = false, gray = false, kind = "gesture", prompt = "", sub = "", mediaId = null }) {
-  Object.assign(P, { list: ids.length ? ids : [null], i: 0, dur, paused: false, mirror, gray, kind, prompt, sub,
-    spent: 0, done: 0, running: true, mediaId });
+export async function runSession({ ids = [], dur = 60, mirror = false, gray = false, kind = "gesture", prompt = "", sub = "",
+  mediaId = null, tag = "", ctype = "" }) {
+  const list = ids.map(srcOf).filter(Boolean);
+  const first = ids[0];
+  if (mediaId == null && first != null) mediaId = typeof first === "number" ? first : first.id ?? null;
+  Object.assign(P, { list: list.length ? list : [null], i: 0, dur, paused: false, mirror, gray, kind, prompt, sub,
+    spent: 0, done: 0, running: true, mediaId, tag, ctype });
   $("#practice").hidden = false;
   $("#practice").classList.remove("finished");
   $("#pRing").style.visibility = dur ? "" : "hidden";
@@ -128,13 +99,13 @@ export async function runSession({ ids = [], dur = 60, mirror = false, gray = fa
 }
 
 function showCurrent() {
-  const id = P.list[P.i];
+  const src = P.list[P.i];
   const stage = $("#pStage");
   stage.className = "stage" + (P.gray ? " gray" : "") + (P.mirror ? " mirror" : "");
-  if (id) {
-    stage.innerHTML = `${P.prompt ? `<div class="pprompt-mini">${esc(P.prompt)}${P.sub ? ` · <span class="muted">${esc(P.sub)}</span>` : ""}</div>` : ""}<img src="${fileUrl(id)}" alt="">`;
+  if (src) {
+    stage.innerHTML = `${P.prompt ? `<div class="pprompt-mini">${esc(P.prompt)}${P.sub ? ` · <span class="muted">${esc(P.sub)}</span>` : ""}</div>` : ""}<img src="${esc(src)}" alt="">`;
     const next = P.list[P.i + 1];
-    if (next) new Image().src = fileUrl(next);
+    if (next) new Image().src = next;
   } else {
     stage.innerHTML = `<div class="pprompt">${esc(P.prompt)}${P.sub ? `<small>${esc(P.sub)}</small>` : ""}</div>`;
   }
@@ -178,7 +149,7 @@ async function finish(early = false) {
   const count = early ? P.done + (P.left < P.dur ? 1 : 0) : P.list.length;
   $("#pRing").classList.remove("warn");
   if (P.spent > 10) {
-    await api("/practice", { method: "POST", body: { kind: P.kind, count: P.kind === "challenge" ? 1 : count, seconds: P.spent, prompt: P.prompt, media_id: P.mediaId } }).catch(() => {});
+    await api("/practice", { method: "POST", body: { kind: P.kind, count: P.kind === "challenge" ? 1 : count, seconds: P.spent, prompt: P.prompt, media_id: P.mediaId, tag: P.tag, ctype: P.ctype } }).catch(() => {});
     emit("practice-logged");
   }
   const st = await api("/stats").catch(() => null);

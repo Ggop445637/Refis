@@ -25,6 +25,8 @@
   <symbol id="i-dice" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
   <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></symbol>
   <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
+  <symbol id="i-broom" viewBox="0 0 24 24"><path d="M14 4l6 6M12.5 5.5l6 6-5 5-6-6zM7.5 10.5 3 15l6 6 4.5-4.5"/></symbol>
+  <symbol id="i-pinterest" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M11 8.5c2.8-.8 5 .7 5 3.2 0 2.4-1.6 4.2-3.5 4.2-1.1 0-1.7-.7-1.6-1.6M11.6 10.5 9.5 20"/></symbol>
   <symbol id="i-cmd" viewBox="0 0 24 24"><path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3z"/></symbol>
 </svg>
 
@@ -37,8 +39,10 @@
     <nav class="nav" id="mainNav">
       <div class="pill"></div>
       <button data-page="today"><svg class="i"><use href="#i-sun"/></svg>Сегодня</button>
+      <button data-page="organize"><svg class="i"><use href="#i-broom"/></svg>Порядок<span class="cnt" id="orgBadge"></span></button>
       <button data-page="library"><svg class="i"><use href="#i-grid"/></svg>Библиотека<span class="cnt" data-count="all"></span></button>
       <button data-page="boards"><svg class="i"><use href="#i-board"/></svg>Доски</button>
+      <button data-page="pinterest"><svg class="i"><use href="#i-pinterest"/></svg>Pinterest<span class="cnt" id="pinBadge"></span></button>
     </nav>
 
     <nav class="nav sub" id="views">
@@ -132,6 +136,11 @@
       <aside id="details"></aside>
     </section>
 
+    <!-- ПОРЯДОК -->
+    <section class="page scroll" data-page="organize"><div class="wide" id="organize"></div></section>
+    <!-- PINTEREST -->
+    <section class="page scroll" data-page="pinterest"><div class="wide" id="pinterest"></div></section>
+
     <!-- ДОСКИ -->
     <section class="page" data-page="boards"><div class="boards" id="boards"></div></section>
     <section class="page" data-page="board" id="boardPage"></section>
@@ -193,6 +202,17 @@
     <button data-p="gray" title="Ч/Б (G)">Ч/Б</button>
     <button data-p="stop" title="Закончить (Esc)">Закончить</button>
   </div>
+</div>
+
+<!-- БЫСТРАЯ РАЗМЕТКА -->
+<div id="triage" class="overlay" hidden>
+  <div class="tri-top">
+    <div class="tri-progress"><div id="triBar"></div></div>
+    <span id="triCount"></span>
+    <button id="triClose" class="ghost">Готово ✕</button>
+  </div>
+  <div class="tri-stage" id="triStage"></div>
+  <aside class="tri-panel" id="triPanel"></aside>
 </div>
 
 <div id="modal" class="overlay modal" hidden><div class="mbox"></div></div>

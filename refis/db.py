@@ -21,6 +21,7 @@ def _data_dir() -> Path:
 DATA_DIR = _data_dir()
 THUMB_DIR = DATA_DIR / "thumbs"
 ASSET_DIR = DATA_DIR / "board_assets"
+PIN_DIR = DATA_DIR / "pins"
 DB_PATH = DATA_DIR / "refis.db"
 
 KINDS = ("ref", "own", "tutorial", "other")
@@ -90,12 +91,39 @@ CREATE TABLE IF NOT EXISTS boards (
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS pin_sources (
+    id INTEGER PRIMARY KEY,
+    url TEXT NOT NULL UNIQUE,      -- RSS-лента доски или профиля
+    page TEXT NOT NULL,            -- обычная ссылка на Pinterest
+    kind TEXT NOT NULL,            -- board | user
+    title TEXT NOT NULL DEFAULT '',
+    tag TEXT NOT NULL DEFAULT '',
+    folder_id INTEGER,
+    auto_save INTEGER NOT NULL DEFAULT 0,
+    last_sync REAL,
+    last_error TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS pins (
+    id INTEGER PRIMARY KEY,
+    guid TEXT NOT NULL UNIQUE,
+    source_id INTEGER NOT NULL REFERENCES pin_sources(id) ON DELETE CASCADE,
+    title TEXT NOT NULL DEFAULT '',
+    link TEXT NOT NULL DEFAULT '',
+    image TEXT NOT NULL,           -- ссылка на картинку из ленты
+    published REAL,
+    status TEXT NOT NULL DEFAULT 'new',  -- new | saved | hidden
+    media_id INTEGER,
+    added_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS pins_status ON pins(status);
 """
 
 # Колонки, добавленные после первой версии: (таблица, колонка, определение)
 MIGRATIONS = [
     ("media", "last_viewed", "REAL"),
     ("media", "view_count", "INTEGER NOT NULL DEFAULT 0"),
+    ("practice_log", "tag", "TEXT NOT NULL DEFAULT ''"),
+    ("practice_log", "ctype", "TEXT NOT NULL DEFAULT ''"),
 ]
 
 _local = threading.local()
@@ -117,6 +145,7 @@ def init() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     THUMB_DIR.mkdir(parents=True, exist_ok=True)
     ASSET_DIR.mkdir(parents=True, exist_ok=True)
+    PIN_DIR.mkdir(parents=True, exist_ok=True)
     conn = connect()
     conn.executescript(SCHEMA)
     for table, col, decl in MIGRATIONS:

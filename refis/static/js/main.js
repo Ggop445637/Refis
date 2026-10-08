@@ -8,6 +8,8 @@ import { viewerOpen, viewerKey } from "./viewer.js";
 import { practiceOpen, practiceKey, practiceDialog } from "./practice.js";
 import { renderToday, startChallenge } from "./today.js";
 import { renderBoards, openBoard, createBoard, boardKey, boardPaste, boardDrop, boardActive, leaveBoard } from "./boards.js";
+import { renderOrganize, openTriage, triageOpen, triageKey, updateBadge } from "./organize.js";
+import { renderPinterest, updatePinBadge } from "./pinboard.js";
 
 let page = null;
 let libLoaded = false;
@@ -31,6 +33,7 @@ export function go(p) {
   if (prev === "board") leaveBoard();
   const swap = () => {
     page = p;
+    document.body.dataset.page = p;
     $$(".page").forEach((el) => el.classList.toggle("active", el.dataset.page === p));
     const navPage = p === "board" ? "boards" : p;
     $$("#mainNav button").forEach((b) => b.classList.toggle("active", b.dataset.page === navPage));
@@ -45,6 +48,8 @@ export function go(p) {
   if (p !== "board") store("page", p);
   if (p === "today") renderToday();
   if (p === "boards") renderBoards();
+  if (p === "organize") renderOrganize();
+  if (p === "pinterest") renderPinterest();
   if (p === "library") {
     if (!libLoaded) { libLoaded = true; load(); }
     else requestAnimationFrame(layout);
@@ -79,6 +84,7 @@ async function poll() {
   }
   if (wasBusy && !busy) {
     loadFolders(); loadTags();
+    if (page === "organize") renderOrganize();
     if (page === "library") load();
     if (page === "today") renderToday();
   }
@@ -108,7 +114,10 @@ function commands() {
     { g: "Переход", ic: "☀", t: "Сегодня", run: () => go("today"), k: "Ctrl 1" },
     { g: "Переход", ic: "▦", t: "Библиотека", run: () => go("library"), k: "Ctrl 2" },
     { g: "Переход", ic: "◫", t: "Доски", run: () => go("boards"), k: "Ctrl 3" },
-    { g: "Действия", ic: "🎲", t: "Нарисуй это — случайное задание", run: () => startChallenge(null, true) },
+    { g: "Переход", ic: "🧹", t: "Порядок в библиотеке", run: () => go("organize"), k: "Ctrl 4" },
+    { g: "Переход", ic: "📌", t: "Pinterest", run: () => go("pinterest"), k: "Ctrl 5" },
+    { g: "Действия", ic: "🎲", t: "Нарисуй это — задание из моих тем", run: () => startChallenge() },
+    { g: "Действия", ic: "🏷", t: "Быстрая разметка файлов без тегов", run: () => openTriage() },
     { g: "Действия", ic: "⏱", t: "Тренировка набросков", run: () => { go("library"); practiceDialog({ params: filterParams(), total: lib.total }); } },
     { g: "Действия", ic: "◫", t: "Новая доска", run: () => createBoard() },
     { g: "Действия", ic: "＋", t: "Добавить папку", run: () => folderDialog() },
@@ -188,8 +197,9 @@ addEventListener("keydown", (e) => {
   if (!$("#palette").hidden) return;
   if (modalOpen()) { if (k === "Escape") closeModal(); return; }
   if (practiceOpen()) { e.preventDefault(); practiceKey(e); return; }
+  if (triageOpen()) { if (triageKey(e) && !isTyping(e)) e.preventDefault(); return; }
   if (viewerOpen()) { if (!isTyping(e)) { e.preventDefault(); viewerKey(e); } return; }
-  if (ctrl && ["1", "2", "3"].includes(k)) { e.preventDefault(); go({ 1: "today", 2: "library", 3: "boards" }[k]); return; }
+  if (ctrl && ["1", "2", "3", "4", "5"].includes(k)) { e.preventDefault(); go({ 1: "today", 2: "library", 3: "boards", 4: "organize", 5: "pinterest" }[k]); return; }
   if ((ctrl && (k === "f" || k === "а")) || (k === "/" && !isTyping(e))) {
     e.preventDefault(); go("library"); setTimeout(() => $("#search").focus(), 30); return;
   }
@@ -241,6 +251,8 @@ addEventListener("resize", () => { movePill("#mainNav"); movePill("#views"); });
   initLibrary();
   await Promise.all([loadFolders(), loadTags(), loadSaved()]).catch(() => {});
   go(store("page") || "today");
+  api("/organize/health").then(updateBadge).catch(() => {});
+  api("/pinterest/sources").then(updatePinBadge).catch(() => {});
   requestAnimationFrame(() => { movePill("#mainNav"); movePill("#views"); });
   poll();
 })();

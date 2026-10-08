@@ -55,39 +55,45 @@ function gridSvg(n) {
 export function openViewer(source, id, fromEl) {
   V.src = source;
   V.id = id;
-  V.rot = 0;
+  V.mirror = false; // зеркало — временный инструмент, не переносим между открытиями
   root.hidden = false;
   V.open = true;
   requestAnimationFrame(() => root.classList.add("show"));
   show(fromEl, 0);
 }
 
+const fullSrc = (it) => it.src || fileUrl(it.id);
+const lowSrc = (it) => it.thumb || thumbUrl(it);
+
 function show(fromEl, dir) {
   const it = item();
   if (!it) return close();
+  V.rot = 0;
   stage.className = "stage" + (V.gray ? " gray" : "") + (V.blur ? " blur" : "");
   root.classList.toggle("is-video", it.type === "video");
+  root.classList.toggle("external", !!it.external);
   const idx = V.src.items.indexOf(it);
   const total = V.src.total?.() ?? V.src.items.length;
-  $("#vTitle").innerHTML = `<span>${idx + 1} / ${total}</span><b>${esc(it.name)}</b>${it.tags?.length ? `<span>${esc(it.tags.join(" · "))}</span>` : ""}`;
+  $("#vTitle").innerHTML = `<span>${idx + 1} / ${total}</span><b>${esc(it.name || "")}</b>${it.tags?.length ? `<span>${esc(it.tags.join(" · "))}</span>` : ""}`;
   $('[data-act="fav"]').textContent = it.favorite ? "♥" : "♡";
   syncButtons();
-  api(`/media/${it.id}/viewed`, { method: "POST" }).catch(() => {});
+  if (!it.external) api(`/media/${it.id}/viewed`, { method: "POST" }).catch(() => {});
 
-  V.natW = it.width || 1200;
-  V.natH = it.height || 900;
+  const known = !!(it.width && it.height);
+  V.natW = it.width || 1000;
+  V.natH = it.height || 1000;
   const old = V.box;
   const box = document.createElement("div");
   box.className = "vbox" + (V.mirror ? " mirror" : "");
-  box.style.width = V.natW + "px";
-  box.style.height = V.natH + "px";
   V.box = box;
+  const size = () => { box.style.width = V.natW + "px"; box.style.height = V.natH + "px"; };
+  size();
 
   let media;
   if (it.type === "video") {
     media = document.createElement("video");
-    media.src = fileUrl(it.id);
-    media.poster = thumbUrl(it);
+    media.src = fullSrc(it);
+    media.poster = lowSrc(it);
     media.autoplay = true;
     media.loop = V.loop;
     media.muted = !!store("muted");
@@ -95,8 +101,7 @@ function show(fromEl, dir) {
     media.onloadedmetadata = () => {
       if (media.videoWidth && (media.videoWidth !== V.natW || media.videoHeight !== V.natH)) {
         V.natW = media.videoWidth; V.natH = media.videoHeight;
-        box.style.width = V.natW + "px"; box.style.height = V.natH + "px";
-        fit(false);
+        size(); fit(false);
       }
     };
     media.onerror = () => {
@@ -111,7 +116,6 @@ function show(fromEl, dir) {
   } else {
     const low = new Image();
     low.className = "lowres";
-    low.src = thumbUrl(it);
     low.draggable = false;
     media = new Image();
     media.className = "full";
@@ -119,22 +123,39 @@ function show(fromEl, dir) {
     media.onload = () => {
       media.classList.add("loaded");
       setTimeout(() => low.remove(), 400);
-      if (media.naturalWidth !== V.natW || media.naturalHeight !== V.natH) {
+      // настоящие размеры (с учётом поворота из EXIF) — подгоняем рамку без «прыжка» пропорций
+      if (Math.abs(media.naturalWidth / media.naturalHeight - V.natW / V.natH) > 0.01) {
         V.natW = media.naturalWidth; V.natH = media.naturalHeight;
-        box.style.width = V.natW + "px"; box.style.height = V.natH + "px";
-        fit(false);
+        size(); fit(false);
       }
     };
-    media.src = fileUrl(it.id);
+    media.onerror = () => { media.remove(); };
+    low.src = lowSrc(it);
+    media.src = fullSrc(it);
     box.append(low, media);
-    loadPalette(it);
+    if (!it.external) loadPalette(it); else $("#vPalette").innerHTML = "";
+    if (!known) {
+      // размеры неизвестны — сначала узнаём пропорции по превью, потом показываем
+      box.style.visibility = "hidden";
+      const reveal = () => {
+        if (V.box !== box) return;
+        const w = low.naturalWidth || media.naturalWidth, h = low.naturalHeight || media.naturalHeight;
+        if (w && h) { V.natW = 1000 * w / Math.max(w, h); V.natH = 1000 * h / Math.max(w, h); size(); }
+        box.style.visibility = "";
+        enter(box, fromEl, dir);
+      };
+      low.decode().then(reveal, () => (media.complete ? reveal() : media.addEventListener("load", reveal, { once: true })));
+    }
   }
   box.insertAdjacentHTML("beforeend", gridSvg(V.grid));
   V.media = media;
   stage.innerHTML = "";
   stage.appendChild(box);
   if (old) old.remove();
+  if (known || it.type === "video") enter(box, fromEl, dir);
+}
 
+function enter(box, fromEl, dir) {
   const f = fitParams();
   V.x = f.x; V.y = f.y; V.scale = f.s;
   apply();
@@ -244,7 +265,7 @@ async function act(a) {
     case "loop": V.loop = !V.loop; if (v) v.loop = V.loop; break;
     case "back": if (v) { v.pause(); v.currentTime = Math.max(0, v.currentTime - 1 / 30); } break;
     case "fwd": if (v) { v.pause(); v.currentTime += 1 / 30; } break;
-    case "copy": if (it.type === "image") copyImage(fileUrl(it.id)); else toast("Копировать можно только картинки"); break;
+    case "copy": if (it.type === "image") copyImage(fullSrc(it)); else toast("Копировать можно только картинки"); break;
     case "pick": {
       if (!("EyeDropper" in window)) return;
       try {
@@ -253,8 +274,9 @@ async function act(a) {
       } catch {}
       break;
     }
-    case "board": addToBoardDialog([it.id]); break;
+    case "board": if (it.external) return toast("Сначала сохраните картинку в библиотеку"); addToBoardDialog([it.id]); break;
     case "fav": {
+      if (it.external) return;
       it.favorite = it.favorite ? 0 : 1;
       await api(`/media/${it.id}`, { method: "PATCH", body: { favorite: !!it.favorite } });
       $('[data-act="fav"]').textContent = it.favorite ? "♥" : "♡";
@@ -372,7 +394,7 @@ export function viewerKey(e) {
     return true;
   }
   if (!v && k === " ") { step(1); return true; }
-  if (/^[0-5]$/.test(k) && !e.ctrlKey && k !== "0") {
+  if (/^[0-5]$/.test(k) && !e.ctrlKey && k !== "0" && !item().external) {
     const it = item();
     it.rating = +k;
     api(`/media/${it.id}`, { method: "PATCH", body: { rating: it.rating } }).then(() => V.src.onChange?.(it.id));

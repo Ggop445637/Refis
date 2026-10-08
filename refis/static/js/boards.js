@@ -116,7 +116,8 @@ function render() {
   const world = $("#bWorld");
   if (!world) return;
   const seen = new Set();
-  [...B.items].sort((a, b) => (a.z || 0) - (b.z || 0)).forEach((it, i) => {
+  const ordered = [...B.items].sort((a, b) => (a.z || 0) - (b.z || 0));
+  ordered.forEach((it) => {
     seen.add(it.id);
     let el = B.els.get(it.id);
     if (!el || !el.isConnected) {
@@ -132,11 +133,16 @@ function render() {
         el.innerHTML = `<div class="bi"><video src="${esc(it.src)}" muted loop autoplay playsinline></video></div><div class="handle"></div>`;
       } else {
         el.innerHTML = `<div class="bi"><img src="${esc(it.src)}" alt="" draggable="false"></div><div class="handle"></div>`;
+        fixAspectOnLoad(el, it);
       }
-      if (it._new) { el.classList.add("new"); delete it._new; }
+      if (it._new) {
+        // анимация появления — один раз, только для действительно новых элементов
+        el.classList.add("new");
+        $(".bi", el).addEventListener("animationend", () => el.classList.remove("new"), { once: true });
+        delete it._new;
+      }
       B.els.set(it.id, el);
     }
-    world.appendChild(el); // порядок DOM = порядок слоёв
     place(el, it);
     el.classList.toggle("flip", !!it.flip);
     el.classList.toggle("gray", !!it.gray);
@@ -146,7 +152,25 @@ function render() {
     if (it.type === "note") $(".bi", el).dataset.c = it.color || "";
   });
   B.els.forEach((el, id) => { if (!seen.has(id)) { el.remove(); B.els.delete(id); } });
+  // порядок слоёв = порядок в DOM; переставляем элементы, только если порядок действительно изменился
+  const want = ordered.map((it) => B.els.get(it.id));
+  const have = [...world.children];
+  if (want.length !== have.length || want.some((el, i) => el !== have[i])) {
+    want.forEach((el, i) => { if (world.children[i] !== el) world.insertBefore(el, world.children[i] || null); });
+  }
   $("#bEmpty").hidden = B.items.length > 0;
+}
+
+/** Если пропорции элемента не совпали с картинкой (размеры были неизвестны) — подгоняем высоту. */
+function fixAspectOnLoad(el, it) {
+  const img = $("img", el);
+  img.addEventListener("load", () => {
+    const a = img.naturalWidth / img.naturalHeight;
+    if (!a || Math.abs(it.w / it.h - a) < 0.02) return;
+    it.h = it.w / a;
+    place(el, it);
+    scheduleSave();
+  }, { once: true });
 }
 
 function place(el, it) {
