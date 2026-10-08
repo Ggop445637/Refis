@@ -121,7 +121,7 @@ export function promptDialog(title, text, value, onOk) {
     (box, close) => {
       const ok = async () => { const v = $("#mVal", box).value.trim(); if (!v) return; close(); await onOk(v); };
       $("#mOk", box).onclick = ok;
-      $("#mVal", box).onkeydown = (e) => e.key === "Enter" && ok();
+      $("#mVal", box).onkeydown = (e) => { if (e.key === "Enter") ok(); };
       setTimeout(() => $("#mVal", box).select(), 40);
     });
 }

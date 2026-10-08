@@ -824,7 +824,7 @@ export function uploadDialog(list) {
     <div class="actions"><button data-close>Отмена</button><button class="primary" id="uOk">Добавить</button></div>`,
     (box, close) => {
       setTimeout(() => $("#uTags", box).focus(), 40);
-      $("#uTags", box).onkeydown = (e) => e.key === "Enter" && $("#uOk", box).click();
+      $("#uTags", box).onkeydown = (e) => { if (e.key === "Enter") $("#uOk", box).click(); };
       $("#uOk", box).onclick = async () => {
         const fd = new FormData();
         list.forEach((f) => fd.append("files", f, f.name));

@@ -69,7 +69,7 @@ function renderConnect(root) {
     try { await connect(url); } finally { const b = $("#pinGo"); if (b) { b.disabled = false; b.textContent = "Подключить"; } }
   };
   $("#pinGo").onclick = go;
-  $("#pinUrl").onkeydown = (e) => e.key === "Enter" && go();
+  $("#pinUrl").onkeydown = (e) => { if (e.key === "Enter") go(); };
   setTimeout(() => $("#pinUrl")?.focus(), 50);
 }
 
@@ -89,7 +89,7 @@ function connectDialog() {
     (box, close) => {
       const ok = async () => { const u = $("#cUrl", box).value.trim(); if (!u) return; $("#cOk", box).disabled = true; try { await connect(u); close(); } catch { $("#cOk", box).disabled = false; } };
       $("#cOk", box).onclick = ok;
-      $("#cUrl", box).onkeydown = (e) => e.key === "Enter" && ok();
+      $("#cUrl", box).onkeydown = (e) => { if (e.key === "Enter") ok(); };
     });
 }
 
