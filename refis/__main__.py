@@ -57,6 +57,15 @@ class JsApi:
     def toggle_fullscreen(self):
         self._window.toggle_fullscreen()
 
+    def restart(self):
+        """Перезапуск — нужен, например, после восстановления из резервной копии."""
+        import subprocess
+        frozen = getattr(sys, "frozen", False)
+        cmd = [sys.executable] + ([] if frozen else ["-m", "refis"]) + [a for a in sys.argv[1:] if a != "--selftest"]
+        cwd = os.path.dirname(sys.executable) if frozen else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        subprocess.Popen(cmd, cwd=cwd)
+        self._window.destroy()
+
 
 def selftest(url: str) -> int:
     """Проверка собранной программы (используется в CI): сервер, интерфейс, ffmpeg."""

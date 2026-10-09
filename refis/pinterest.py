@@ -9,10 +9,8 @@ import html
 import logging
 import os
 import re
-import ssl
 import threading
 import time
-import urllib.request
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
 
@@ -21,28 +19,13 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from . import db, media
+from .net import http_get
 
 log = logging.getLogger("refis")
 router = APIRouter(prefix="/api/pinterest")
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 SYNC_EVERY = 3 * 3600
 _RESERVED = {"pin", "search", "ideas", "today", "settings", "business", "_", "explore", "categories"}
 _lock = threading.Lock()
-
-
-def _ssl_context():
-    try:
-        import certifi
-        return ssl.create_default_context(cafile=certifi.where())
-    except Exception:
-        return ssl.create_default_context()
-
-
-def http_get(url: str, timeout: int = 25) -> tuple[bytes, str, str]:
-    """Скачивает URL. Возвращает (данные, content-type, итоговый адрес после редиректов)."""
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
-    with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as r:
-        return r.read(), r.headers.get("Content-Type", ""), r.geturl()
 
 
 # ======================================================================= ссылки
@@ -175,9 +158,11 @@ def sync_all(force: bool = False) -> None:
 def background_sync() -> None:
     def loop():
         time.sleep(20)
+        from . import system
         while True:
             try:
-                sync_all()
+                if system.get("pinterest_sync"):
+                    sync_all()
             except Exception as e:
                 log.warning("pinterest sync: %s", e)
             time.sleep(1800)
@@ -225,7 +210,8 @@ def save_pins(ids: list[int], folder_id: int, subdir: str | None, tags: list[str
             with open(path, "wb") as f:
                 f.write(data)
             tag_list = list(tags) if tags is not None else [t for t in (p["stag"], "pinterest") if t]
-            mid = media.register_file(conn, folder, path, "", tag_list, source=p["link"] or "pinterest")
+            # пины — всегда чужие референсы, даже если папка «мои работы»
+            mid = media.register_file(conn, folder, path, "ref", tag_list, source=p["link"] or "pinterest")
             if p["title"]:
                 conn.execute("UPDATE media SET notes = ? WHERE id = ?", (p["title"], mid))
             conn.execute("UPDATE pins SET status = 'saved', media_id = ? WHERE id = ?", (mid, pid))

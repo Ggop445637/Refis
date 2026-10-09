@@ -125,3 +125,25 @@ def test_pinterest_sync_and_save(client, fake_net):
 
 def test_discover_runs(client):
     assert client.get("/api/organize/discover").status_code == 200
+
+
+def test_profile_stats(client):
+    p = client.get("/api/profile").json()
+    t = p["totals"]
+    assert t["sessions"] >= 5 and t["minutes"] >= 50 and t["streak"] >= 1 and t["best_streak"] >= 1
+    assert len(p["weeks"]) == 26 and p["weeks"][-1]["minutes"] >= 50
+    assert p["topics"][0]["tag"] == "dragon"
+    assert {a["id"] for a in p["achievements"] if a["done"]} >= {"first"}
+    own = {x["name"] for x in p["own"]}
+    assert "my_dragon_2023" in own and not own & {"Torso study", "Hands gesture"}  # пины — не «мои работы»
+
+
+def test_streaks():
+    import datetime as dt
+
+    from refis.profile import _streaks
+    today = dt.date.today()
+    days = {today - dt.timedelta(days=i) for i in (0, 1, 2, 10, 11, 12, 13, 14)}
+    assert _streaks(days) == (3, 5)
+    assert _streaks({today - dt.timedelta(days=1)}) == (1, 1)  # вчера — серия ещё жива
+    assert _streaks(set()) == (0, 0)

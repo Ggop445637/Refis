@@ -10,6 +10,8 @@ import { renderToday, startChallenge } from "./today.js";
 import { renderBoards, openBoard, createBoard, boardKey, boardPaste, boardDrop, boardActive, leaveBoard } from "./boards.js";
 import { renderOrganize, openTriage, triageOpen, triageKey, updateBadge } from "./organize.js";
 import { renderPinterest, updatePinBadge } from "./pinboard.js";
+import { loadSettings, renderSettings, checkUpdatesOnStart, settings as appSettings } from "./settings.js";
+import { renderProfile } from "./profile.js";
 
 let page = null;
 let libLoaded = false;
@@ -45,11 +47,14 @@ export function go(p) {
     }
   };
   transition(swap);
-  if (p !== "board") store("page", p);
+  if (p !== "board" && p !== "settings") store("page", p);
+  $("#settingsBtn").classList.toggle("on", p === "settings");
   if (p === "today") renderToday();
   if (p === "boards") renderBoards();
   if (p === "organize") renderOrganize();
   if (p === "pinterest") renderPinterest();
+  if (p === "settings") renderSettings();
+  if (p === "profile") renderProfile();
   if (p === "library") {
     if (!libLoaded) { libLoaded = true; load(); }
     else requestAnimationFrame(layout);
@@ -124,7 +129,9 @@ function commands() {
     { g: "Действия", ic: "⟳", t: "Пересканировать все папки", run: async () => { await api("/scan", { method: "POST" }); poll(); toast("Сканирую…"); } },
     { g: "Действия", ic: "◨", t: "Показать/скрыть панель деталей", run: () => { go("library"); toggleDetails(); }, k: "I" },
     { g: "Действия", ic: "📌", t: "Окно поверх всех окон", run: togglePin },
-    { g: "Действия", ic: "✨", t: "Вкл/выкл фоновую анимацию", run: () => { document.body.classList.toggle("perf"); store("perf", document.body.classList.contains("perf")); } },
+    { g: "Переход", ic: "👤", t: "Профиль и статистика", run: () => go("profile") },
+    { g: "Переход", ic: "⚙", t: "Настройки", run: () => go("settings") },
+    { g: "Действия", ic: "💾", t: "Создать резервную копию", run: async () => { const r = await api("/backup", { method: "POST" }); toast(`Копия: ${r.path}`, { life: 6000 }); } },
     { g: "Библиотека", ic: "★", t: "Избранное", run: () => { go("library"); applyQuery({ view: "fav" }); } },
     { g: "Библиотека", ic: "🏷", t: "Файлы без тегов", run: () => { go("library"); applyQuery({ view: "untagged" }); } },
     { g: "Библиотека", ic: "⧉", t: "Дубликаты", run: () => { go("library"); applyQuery({ view: "dupes" }); } },
@@ -187,6 +194,7 @@ async function openPalette() {
 }
 function closePalette() { $("#palette").hidden = true; }
 $("#cmdkBtn").onclick = openPalette;
+$("#settingsBtn").onclick = () => go("settings");
 
 // ======================================================================= клавиатура
 
@@ -247,10 +255,12 @@ addEventListener("resize", () => { movePill("#mainNav"); movePill("#views"); });
 // ======================================================================= старт
 
 (async function init() {
-  if (store("perf")) document.body.classList.add("perf");
+  await loadSettings().catch(() => {});
   initLibrary();
   await Promise.all([loadFolders(), loadTags(), loadSaved()]).catch(() => {});
-  go(store("page") || "today");
+  const start = appSettings.start_page === "last" ? store("page") : appSettings.start_page;
+  go(start || "today");
+  setTimeout(checkUpdatesOnStart, 2500);
   api("/organize/health").then(updateBadge).catch(() => {});
   api("/pinterest/sources").then(updatePinBadge).catch(() => {});
   requestAnimationFrame(() => { movePill("#mainNav"); movePill("#views"); });

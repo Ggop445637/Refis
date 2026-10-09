@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, db, media, organize, pinterest, security
+from . import __version__, db, media, organize, pinterest, profile, security, system
 
 STATIC = Path(__file__).resolve().parent / "static"
 
@@ -28,7 +28,11 @@ mimetypes.add_type("image/svg+xml", ".svg")
 
 @asynccontextmanager
 async def lifespan(_app):
+    db.DATA_DIR.mkdir(parents=True, exist_ok=True)
+    db.ASSET_DIR.mkdir(parents=True, exist_ok=True)
+    system.apply_pending_restore()
     db.init()
+    system.startup()
     # пересканировать папки в фоне: подхватить новые/удалённые файлы
     threading.Thread(target=media.scan_all, daemon=True).start()
     media.thumbs.kick()
@@ -695,5 +699,7 @@ def get_asset(name: str):
 
 
 app.include_router(organize.router)
+app.include_router(system.router)
+app.include_router(profile.router)
 app.include_router(pinterest.router)
 app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")

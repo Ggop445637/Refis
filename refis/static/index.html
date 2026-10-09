@@ -27,6 +27,8 @@
   <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
   <symbol id="i-broom" viewBox="0 0 24 24"><path d="M14 4l6 6M12.5 5.5l6 6-5 5-6-6zM7.5 10.5 3 15l6 6 4.5-4.5"/></symbol>
   <symbol id="i-pinterest" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M11 8.5c2.8-.8 5 .7 5 3.2 0 2.4-1.6 4.2-3.5 4.2-1.1 0-1.7-.7-1.6-1.6M11.6 10.5 9.5 20"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></symbol>
   <symbol id="i-cmd" viewBox="0 0 24 24"><path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3z"/></symbol>
 </svg>
 
@@ -43,6 +45,7 @@
       <button data-page="library"><svg class="i"><use href="#i-grid"/></svg>Библиотека<span class="cnt" data-count="all"></span></button>
       <button data-page="boards"><svg class="i"><use href="#i-board"/></svg>Доски</button>
       <button data-page="pinterest"><svg class="i"><use href="#i-pinterest"/></svg>Pinterest<span class="cnt" id="pinBadge"></span></button>
+      <button data-page="profile"><svg class="i"><use href="#i-user"/></svg>Профиль</button>
     </nav>
 
     <nav class="nav sub" id="views">
@@ -76,6 +79,7 @@
     <div class="sb-foot">
       <button class="cmdk" id="cmdkBtn" title="Командная панель"><span>Команды</span><kbd>Ctrl K</kbd></button>
       <button class="icon" id="pinBtn" title="Поверх всех окон" hidden><svg class="i"><use href="#i-pin"/></svg></button>
+      <button class="icon" id="settingsBtn" data-page="settings" title="Настройки и «О программе»"><svg class="i"><use href="#i-gear"/></svg></button>
     </div>
   </aside>
 
@@ -140,6 +144,10 @@
     <section class="page scroll" data-page="organize"><div class="wide" id="organize"></div></section>
     <!-- PINTEREST -->
     <section class="page scroll" data-page="pinterest"><div class="wide" id="pinterest"></div></section>
+
+    <!-- ПРОФИЛЬ И НАСТРОЙКИ -->
+    <section class="page scroll" data-page="profile"><div class="wide" id="profile"></div></section>
+    <section class="page scroll" data-page="settings"><div class="wide narrow" id="settings"></div></section>
 
     <!-- ДОСКИ -->
     <section class="page" data-page="boards"><div class="boards" id="boards"></div></section>

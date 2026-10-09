@@ -116,6 +116,10 @@ CREATE TABLE IF NOT EXISTS pins (
     added_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS pins_status ON pins(status);
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 # Колонки, добавленные после первой версии: (таблица, колонка, определение)

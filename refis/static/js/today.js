@@ -4,6 +4,7 @@ import { openViewer } from "./viewer.js";
 import { runSession } from "./practice.js";
 import { state as lib, toggleTag, applyQuery } from "./library.js";
 import { openTriage, updateBadge } from "./organize.js";
+import { settings } from "./settings.js";
 
 let todayN = 0;
 let challengeN = 0;
@@ -21,7 +22,7 @@ export async function renderToday() {
   updateBadge(health);
   const p = stats.practice;
   const date = new Date().toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
-  const hello = `<div class="hello rise"><h1>${greeting()}, <span>художник</span></h1>
+  const hello = `<div class="hello rise"><h1>${greeting()}, <span>${esc(settings.name || "художник")}</span></h1>
     <p>${date[0].toUpperCase() + date.slice(1)}${p.streak ? ` · серия ${p.streak} ${plural(p.streak, "день", "дня", "дней")} подряд 🔥` : ""}</p></div>`;
 
   if (!stats.total) {
