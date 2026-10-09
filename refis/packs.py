@@ -50,6 +50,7 @@ class ExportIn(BaseModel):
     tag: str = ""      # все файлы с тегом
     folder_id: int | None = None  # целая папка библиотеки (или её подпапка sub) со всей структурой
     sub: str = ""
+    kind: str = ""     # целый раздел: «Референсы», «Мои работы» или свой
     notes: bool = True  # заметки бывают личными — можно не включать
 
 
@@ -70,9 +71,11 @@ def _folder(fid: int | None, sub: str):
     return f, folders.sub_path(f, sub)
 
 
-def _collect(ids: list[int], board: dict | None, tag: str = "", folder=None, sub: str = "") -> list:
+def _collect(ids: list[int], board: dict | None, tag: str = "", folder=None, sub: str = "", kind: str = "") -> list:
     """Файлы набора по порядку, без повторов и без пропавших с диска."""
     conn = db.connect()
+    by_kind = [r[0] for r in conn.execute(
+        "SELECT id FROM media WHERE kind = ? AND missing = 0 ORDER BY folder_id, path", (kind,))] if kind else []
     by_folder = []
     if folder:
         c, a = folders.under_clause(folder[0], sub)
@@ -82,7 +85,7 @@ def _collect(ids: list[int], board: dict | None, tag: str = "", folder=None, sub
         " WHERE t.name = ? ORDER BY m.added_at", (db.normalize_tag(tag),))] if tag.strip() else []
     order = list(dict.fromkeys(
         [i["mid"] for i in (board or {}).get("data", {}).get("items", []) if i.get("type") == "media" and i.get("mid")]
-        + ids + by_tag + by_folder))
+        + ids + by_tag + by_folder + by_kind))
     rows = {}
     for k in range(0, len(order), 900):
         part = order[k:k + 900]
@@ -96,11 +99,12 @@ class EstimateIn(BaseModel):
     tag: str = ""
     folder_id: int | None = None
     sub: str = ""
+    kind: str = ""
 
 
 @router.post("/estimate")
 def estimate(b: EstimateIn):
-    rows = _collect(b.ids, _board(b.board_id), b.tag, _folder(b.folder_id, b.sub), b.sub)
+    rows = _collect(b.ids, _board(b.board_id), b.tag, _folder(b.folder_id, b.sub), b.sub, b.kind)
     return {"count": len(rows), "size": sum(r["size"] for r in rows),
             "videos": sum(r["type"] == "video" for r in rows)}
 
@@ -110,20 +114,33 @@ def _tags_of(conn, mid: int) -> list[str]:
         "SELECT t.name FROM tags t JOIN media_tags mt ON mt.tag_id = t.id WHERE mt.media_id = ? ORDER BY t.name", (mid,))]
 
 
+def _rel(path: str, root: str) -> str:
+    rel = os.path.relpath(os.path.dirname(path), root).replace("\\", "/")
+    return "" if rel == "." or rel.startswith("..") else folders.clean_sub(rel)
+
+
+def _section_defs(conn, keys) -> list[dict]:
+    rows = {r["key"]: r for r in conn.execute("SELECT * FROM sections")}
+    return [{"key": k, "name": rows[k]["name"], "color": rows[k]["color"]} for k in dict.fromkeys(keys) if k in rows]
+
+
 def build_pack(e: ExportIn, out: Path) -> dict:
     board = _board(e.board_id)
     folder = _folder(e.folder_id, e.sub)
-    rows = _collect(e.ids, board, e.tag, folder, e.sub)
+    rows = _collect(e.ids, board, e.tag, folder, e.sub, e.kind)
     if not rows:
         raise HTTPException(400, tr("В наборе нет файлов"))
     conn = db.connect()
+    lib_paths = {f["id"]: f["path"] for f in conn.execute("SELECT id, path FROM folders")}
     items, index, used = [], {}, set()
     for n, r in enumerate(rows):
         base = media.safe_name(os.path.basename(r["path"]))
         rel = ""
         if folder:  # структура подпапок сохраняется: «Руки/Мужские/…»
-            rel = os.path.relpath(os.path.dirname(r["path"]), folder[1]).replace("\\", "/")
-            rel = "" if rel == "." or rel.startswith("..") else folders.clean_sub(rel)
+            rel = _rel(r["path"], folder[1])
+        elif e.kind and r["folder_id"] in lib_paths:  # раздел: «папка библиотеки/подпапки/…»
+            root = lib_paths[r["folder_id"]]
+            rel = folders.clean_sub("/".join(x for x in (os.path.basename(root.rstrip("\\/")), _rel(r["path"], root)) if x))
         arc = f"files/{rel}/{base}" if rel else f"files/{base}"
         while arc.lower() in used:
             arc = f"files/{rel}/{n}_{base}" if rel else f"files/{n}_{base}"
@@ -153,7 +170,9 @@ def build_pack(e: ExportIn, out: Path) -> dict:
     manifest = {"format": FORMAT, "app": f"Refis {__version__}", "name": e.name.strip() or tr("Набор"),
                 "author": e.author.strip(), "description": e.description.strip(), "created": time.time(),
                 "items": [{k: v for k, v in i.items() if k != "_path"} for i in items], "board": pack_board,
-                "folder": {"name": os.path.basename(folder[1].rstrip("\\/")), "kind": folder[0]["kind"]} if folder else None}
+                "folder": {"name": os.path.basename(folder[1].rstrip("\\/")), "kind": folder[0]["kind"]} if folder else None,
+                "sections": _section_defs(conn, [i["kind"] for i in items] + ([e.kind] if e.kind else [])),
+                "section": e.kind or None}
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".part")
     try:
@@ -260,15 +279,63 @@ def inspect(file: UploadFile = File(...)):
         "tags": [t for t, _ in sorted(tags.items(), key=lambda x: -x[1])[:12]],
         "preview": [n for n, i in enumerate(items) if media.media_type(i["file"]) == "image"][:12],
         "folder": _manifest_folder(m), "dirs": len({_item_dir(i) for i in items} - {""}),
-        "own": sum(i.get("kind") == "own" for i in items),
+        "own": sum(i.get("kind") == "own" for i in items), "section": _manifest_section(m),
     }
+
+
+def _defs(m: dict) -> dict:
+    return {d["key"]: d for d in (m.get("sections") or []) if isinstance(d, dict) and isinstance(d.get("key"), str)}
+
+
+_BUILTIN_NAMES = {"ref": "Референсы", "own": "Мои работы", "tutorial": "Туториалы", "other": "Прочее"}
+
+
+def _section_name(d: dict) -> str:
+    return str(d.get("name") or "").strip()[:60] or tr(_BUILTIN_NAMES.get(d.get("key"), "Раздел"))
+
+
+def _manifest_section(m: dict) -> dict | None:
+    key = m.get("section")
+    if not isinstance(key, str):
+        return None
+    d = _defs(m).get(key, {"key": key})
+    return {"name": _section_name(d), "color": d.get("color") or ""}
+
+
+class SectionMap:
+    """Разделы из набора → разделы этой библиотеки: тот же ключ, раздел с тем же именем или новый раздел."""
+
+    def __init__(self, conn, m: dict):
+        self.conn, self.defs, self.cache = conn, _defs(m), {}
+
+    def __call__(self, key) -> str:
+        if not isinstance(key, str) or not key:
+            return "ref"
+        if key not in self.cache:
+            self.cache[key] = self._resolve(key)
+        return self.cache[key]
+
+    def _resolve(self, key: str) -> str:
+        from . import sections
+        local = db.kinds()
+        d = self.defs.get(key)
+        if key in db.BUILTIN_KINDS and key in local:
+            return key
+        if d is None:
+            return key if key in local else "ref"
+        row = self.conn.execute("SELECT name FROM sections WHERE key = ?", (key,)).fetchone()
+        if row is not None and row["name"].strip().lower() == str(d.get("name") or "").strip().lower():
+            return key  # набор сделан в этой же библиотеке
+        name = _section_name(d)
+        return sections.find_by_name(self.conn, name) or sections.create_section(self.conn, name, str(d.get("color") or ""))
 
 
 def _manifest_folder(m: dict) -> dict | None:
     f = m.get("folder")
     if not isinstance(f, dict) or not isinstance(f.get("name"), str):
         return None
-    return {"name": media.safe_name(f["name"])[:120], "kind": f.get("kind") if f.get("kind") in db.KINDS else "ref"}
+    # раздел папки, которого нет в этой библиотеке, создастся при импорте (пустой kind — «как в наборе»)
+    return {"name": media.safe_name(f["name"])[:120], "kind": f.get("kind") if f.get("kind") in db.kinds() else ""}
 
 
 def _item_dir(it: dict) -> str:
@@ -298,7 +365,7 @@ class ImportIn(BaseModel):
     folder_id: int | None = None  # в существующую папку библиотеки…
     new_parent: str = ""          # …или в новую: new_parent/new_name
     new_name: str = ""
-    new_kind: str = "ref"
+    new_kind: str = "ref"         # пусто — раздел из набора
     subdir: str = ""
     tag: str = ""          # общий тег для всего набора, например «набор/анатомия»
     board: bool = True     # создать доску, если она есть в наборе
@@ -319,6 +386,7 @@ def import_pack(b: ImportIn):
     conn = db.connect()
     with zipfile.ZipFile(src) as z:
         m = read_manifest(z)
+        smap = SectionMap(conn, m)
         name = str(m.get("name") or tr("Набор"))[:120]
         if b.folder_id:
             folder = conn.execute("SELECT * FROM folders WHERE id = ?", (b.folder_id,)).fetchone()
@@ -326,10 +394,11 @@ def import_pack(b: ImportIn):
                 raise HTTPException(400, tr("Папка не найдена"))
             subdir = folders.clean_sub(b.subdir) if b.subdir.strip() else media.safe_name(name)
         else:
-            if b.new_kind not in db.KINDS:
+            new_kind = b.new_kind or smap(m.get("section") or (m.get("folder") or {}).get("kind") or "ref")
+            if new_kind not in db.kinds():
                 raise HTTPException(400, tr("Неизвестный тип"))
             path = folders.create_dir(b.new_parent, b.new_name or name)
-            fid = folders.register_folder(conn, path, b.new_kind, scan=False)
+            fid = folders.register_folder(conn, path, new_kind, scan=False)
             folder = conn.execute("SELECT * FROM folders WHERE id = ?", (fid,)).fetchone()
             subdir = folders.clean_sub(b.subdir)
         common = db.normalize_tag(b.tag)
@@ -350,7 +419,8 @@ def import_pack(b: ImportIn):
                 kind = it.get("kind")
                 if kind == "own" and b.own_as_ref:
                     kind = "ref"  # чужие работы для нас — референсы
-                mid = media.register_file(conn, folder, target, kind if kind in db.KINDS else "", tags,
+                kind = smap(kind)
+                mid = media.register_file(conn, folder, target, kind if kind in db.kinds() else "", tags,
                                           str(it.get("source") or "")[:500])
                 if mid is None:
                     os.remove(target)

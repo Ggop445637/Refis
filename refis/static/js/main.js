@@ -15,6 +15,7 @@ import { loadSettings, renderSettings, checkUpdatesOnStart, settings as appSetti
 import { renderProfile } from "./profile.js";
 import { openPackFile, importPack, isPackFile } from "./packs.js";
 import { createFolderDialog } from "./folders.js";
+import { loadSections, sectionDialog } from "./sections.js";
 
 let page = null;
 let libLoaded = false;
@@ -130,6 +131,7 @@ function commands() {
     { g: tr("Действия"), ic: "◫", t: tr("Новая доска"), run: () => createBoard() },
     { g: tr("Действия"), ic: "📦", t: tr("Открыть набор референсов (.refis)…"), run: openPackFile },
     { g: tr("Действия"), ic: "📁", t: tr("Создать новую папку…"), run: () => createFolderDialog() },
+    { g: tr("Действия"), ic: "＋", t: tr("Новый раздел…"), run: () => { go("library"); sectionDialog(); } },
     { g: tr("Действия"), ic: "＋", t: tr("Подключить существующую папку…"), run: () => folderDialog() },
     { g: tr("Действия"), ic: "⟳", t: tr("Пересканировать все папки"), run: async () => { await api("/scan", { method: "POST" }); poll(); toast(tr("Сканирую…")); } },
     { g: tr("Действия"), ic: "◨", t: tr("Показать/скрыть панель деталей"), run: () => { go("library"); toggleDetails(); }, k: "I" },
@@ -266,6 +268,7 @@ addEventListener("resize", () => { movePill("#mainNav"); movePill("#views"); });
   translateStatic();
   await loadSettings().catch(() => {});
   if (appSettings.lang && rememberLang(appSettings.lang)) return location.reload(); // язык сменили в другом окне
+  await loadSections().catch(() => {});
   initLibrary();
   await Promise.all([loadFolders(), loadTags(), loadSaved()]).catch(() => {});
   const start = appSettings.start_page === "last" ? store("page") : appSettings.start_page;

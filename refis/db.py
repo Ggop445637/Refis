@@ -24,7 +24,10 @@ ASSET_DIR = DATA_DIR / "board_assets"
 PIN_DIR = DATA_DIR / "pins"
 DB_PATH = DATA_DIR / "refis.db"
 
-KINDS = ("ref", "own", "tutorial", "other")
+# Разделы библиотеки (media.kind). Встроенные есть всегда при создании базы; свои добавляет пользователь.
+BUILTIN_KINDS = ("ref", "own", "tutorial", "other")
+CORE_KINDS = ("ref", "own")  # на них опираются задания, профиль и Pinterest — удалить нельзя
+DEFAULT_COLORS = {"ref": "#6aa8ff", "own": "#ffb35c", "tutorial": "#5ee6a0", "other": "#b48cff"}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS folders (
@@ -120,6 +123,12 @@ CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sections (
+    key TEXT PRIMARY KEY,
+    name TEXT NOT NULL DEFAULT '',   -- пусто у встроенных — тогда имя по языку интерфейса
+    color TEXT NOT NULL DEFAULT '',
+    pos INTEGER NOT NULL DEFAULT 0
+);
 """
 
 # Колонки, добавленные после первой версии: (таблица, колонка, определение)
@@ -156,6 +165,14 @@ def init() -> None:
         cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
         if col not in cols:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+    if not conn.execute("SELECT 1 FROM sections LIMIT 1").fetchone():  # новая база или обновление со старой версии
+        conn.executemany("INSERT INTO sections(key, color, pos) VALUES (?, ?, ?)",
+                         [(k, DEFAULT_COLORS[k], i) for i, k in enumerate(BUILTIN_KINDS)])
+
+
+def kinds() -> tuple:
+    """Ключи разделов по порядку."""
+    return tuple(r[0] for r in connect().execute("SELECT key FROM sections ORDER BY pos, rowid"))
 
 
 def tag_id(conn: sqlite3.Connection, name: str) -> int:

@@ -2,7 +2,7 @@
 import { tr, plural } from "./i18n.js";
 import {
   $, $$, api, esc, store, toast, menu, modal, confirmDialog, promptDialog, emit, on,
-  KINDS, fmtDur, fmtSize, files, thumbUrl, fileUrl, copyImage, copyText, isTyping,
+  KINDS, KIND_PLURAL, fmtDur, fmtSize, files, thumbUrl, fileUrl, copyImage, copyText, isTyping,
 } from "./util.js";
 import { openViewer } from "./viewer.js";
 import { practiceDialog } from "./practice.js";
@@ -95,6 +95,9 @@ function cardInner(it) {
     <div class="label">${esc(it.name)}${it.tags.length ? `<br><small>${esc(it.tags.join(" · "))}</small>` : ""}</div>`;
 }
 
+// что видно на карточке — если изменилось, переиспользованную карточку надо перерисовать
+const cardSig = (it) => [it.kind, it.rating, it.favorite, it.name, it.thumb_state, it.duration, it.tags.join("|")].join("\u0001");
+
 function makeCard(it, i, animate) {
   const el = document.createElement("div");
   el.className = "card nomove" + (animate ? " enter" : "") + (state.selected.has(it.id) ? " sel" : "");
@@ -102,6 +105,7 @@ function makeCard(it, i, animate) {
   el.draggable = true; // на папку в боковой панели — переместить
   el.style.setProperty("--i", i);
   el.innerHTML = cardInner(it);
+  el._sig = cardSig(it);
   return el;
 }
 
@@ -114,10 +118,13 @@ const BUFFER = 1200;        // запас над и под экраном, px
 function renderGrid(reset) {
   if (reset) {
     // карточки, которые остались в выдаче, переиспользуем — они плавно переедут на новые места
-    const ids = new Set(state.items.map((i) => i.id));
+    const byId = new Map(state.items.map((i) => [i.id, i]));
     cardEls.forEach((el, id) => {
-      if (!ids.has(id)) { el.remove(); cardEls.delete(id); }
-      else { el.classList.remove("enter"); el.classList.toggle("sel", state.selected.has(id)); }
+      const it = byId.get(id);
+      if (!it) { el.remove(); cardEls.delete(id); return; }
+      el.classList.remove("enter");
+      el.classList.toggle("sel", state.selected.has(id));
+      if (el._sig !== cardSig(it)) updateCard(id);
     });
     shown = new Set(cardEls.keys());
   }
@@ -247,6 +254,7 @@ export function updateCard(id) {
   const img = $("img", el);
   const wasLoaded = img?.classList.contains("loaded");
   el.innerHTML = cardInner(it);
+  el._sig = cardSig(it);
   if (wasLoaded) { $("img", el)?.classList.add("loaded"); $(".ci", el).classList.add("ready"); }
 }
 
@@ -324,7 +332,7 @@ grid.addEventListener("contextmenu", (e) => {
     "-",
     [tr("В избранное"), () => bulk({ ids, favorite: true }), "F"],
     [tr("Убрать из избранного"), () => bulk({ ids, favorite: false })],
-    ...Object.entries(KINDS).map(([k, v]) => [`${tr("Тип")}: ${v}`, () => bulk({ ids, kind: k })]),
+    ...Object.entries(KIND_PLURAL).filter(([k]) => !(one && it.kind === k)).map(([k, v]) => [`${tr("В раздел")}: ${v}`, () => bulk({ ids, kind: k })]),
     "-",
     [`🗑 ${tr("Удалить в Корзину")}`, () => trashMedia(ids), "Del"],
   ]);
@@ -463,8 +471,8 @@ export async function renderDetails() {
       <button id="dFav" class="favbtn ${m.favorite ? "on" : ""}" style="margin-left:auto">${m.favorite ? tr("♥ В избранном") : tr("♡ В избранное")}</button>
     </div>
     <div class="field"><label>${tr("Теги")}</label>${tagEditor(m.tags)}</div>
-    <div class="field"><label>${tr("Тип")}</label>
-      <select id="dKind">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}"${k === m.kind ? " selected" : ""}>${v}</option>`).join("")}</select></div>
+    <div class="field"><label>${tr("Раздел")}</label>
+      <select id="dKind">${Object.entries(KIND_PLURAL).map(([k, v]) => `<option value="${k}"${k === m.kind ? " selected" : ""}>${v}</option>`).join("")}</select></div>
     <div class="field"><label>${tr("Источник, автор, ссылка")}</label><input id="dSource" type="text" value="${esc(m.source)}" placeholder="${tr("pinterest, artstation, имя автора…")}"></div>
     <div class="field"><label>${tr("Заметки")}</label><textarea id="dNotes" placeholder="${tr("Что здесь полезного, что изучить…")}">${esc(m.notes)}</textarea></div>
     <div class="row">
@@ -544,8 +552,8 @@ function renderBulk(ids) {
     <div class="field"><label>${tr("Теги выбранных — × снимает со всех")}</label>
       <div class="row">${Object.entries(common).sort().map(([t, n]) =>
         `<span class="chip">${esc(t)} <small class="muted">${n}</small><button data-t="${esc(t)}">×</button></span>`).join("") || tr('<span class="hint">тегов нет</span>')}</div></div>
-    <div class="field"><label>${tr("Тип")}</label>
-      <select id="bKind"><option value="">— ${tr("не менять")} —</option>${Object.entries(KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+    <div class="field"><label>${tr("Раздел")}</label>
+      <select id="bKind"><option value="">— ${tr("не менять")} —</option>${Object.entries(KIND_PLURAL).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
     <div class="field"><label>${tr("Оценка")}</label>
       <div class="row stars">${[1, 2, 3, 4, 5].map((n) => `<button data-r="${n}">★</button>`).join("")}<button data-r="0" class="mini ghost">${tr("сброс")}</button></div></div>
     <div class="row"><button id="bFav">♥ ${tr("В избранное")}</button><button id="bUnfav">${tr("Убрать из избранного")}</button></div>
@@ -831,7 +839,7 @@ export function toggleDetails() {
 // ======================================================================= диалоги папок и загрузки
 
 function kindOptions(sel) {
-  return Object.entries(KINDS).map(([k, v]) => `<option value="${k}"${k === sel ? " selected" : ""}>${v}</option>`).join("");
+  return Object.entries(KIND_PLURAL).map(([k, v]) => `<option value="${k}"${k === sel ? " selected" : ""}>${v}</option>`).join("");
 }
 
 export function folderDialog(onDone = null) {
@@ -841,7 +849,7 @@ export function folderDialog(onDone = null) {
     <div class="field"><label>${tr("Папка")}</label>
       <div class="row" style="flex-wrap:nowrap"><input type="text" id="fPath" placeholder="${tr("D:\\Арт\\Референсы")}">
       ${native ? tr('<button id="fPick">Обзор…</button>') : ""}</div></div>
-    <div class="field"><label>${tr("Что в ней по умолчанию")}</label><select id="fKind">${kindOptions("ref")}</select></div>
+    <div class="field"><label>${tr("Раздел для её файлов")}</label><select id="fKind">${kindOptions("ref")}</select></div>
     <label class="check"><input type="checkbox" id="fAuto" checked><span>${tr("Сделать теги из названий подпапок")}<br><small class="muted">${tr("«Руки\\Мужские» → теги «руки» и «мужские»")}</small></span></label>
     <div class="actions"><button data-close>${tr("Отмена")}</button><button class="primary" id="fOk">${tr("Добавить")}</button></div>`,
     (box, close) => {
@@ -864,7 +872,7 @@ export function folderDialog(onDone = null) {
 
 function folderSettings(f) {
   modal(`<h2>${tr("Папка")}</h2><p style="word-break:break-all">${esc(f.path)}</p>
-    <div class="field"><label>${tr("Тип по умолчанию")}</label><select id="sKind">${kindOptions(f.kind)}</select></div>
+    <div class="field"><label>${tr("Раздел для её файлов")}</label><select id="sKind">${kindOptions(f.kind)}</select></div>
     <label class="check"><input type="checkbox" id="sApply"> ${tr("Применить этот тип ко всем")} ${files(f.count)} ${tr("папки")}</label>
     <label class="check"><input type="checkbox" id="sAuto"${f.auto_tags ? " checked" : ""}> ${tr("Теги из названий подпапок для новых файлов")}</label>
     <div class="actions" style="justify-content:space-between">
@@ -893,7 +901,7 @@ export function uploadDialog(list) {
     <div class="field"><label>${tr("Папка библиотеки")}</label>
       <select id="uFolder">${state.folders.map((f) => `<option value="${f.id}"${f.id === fid ? " selected" : ""}>${esc(f.path)}</option>`).join("")}</select></div>
     <div class="field"><label>${tr("Подпапка")}</label><input type="text" id="uSub" value="${esc(last.sub ?? tr("_Входящие"))}"></div>
-    <div class="field"><label>${tr("Тип")}</label><select id="uKind"><option value="">${tr("как у папки")}</option>${kindOptions("")}</select></div>
+    <div class="field"><label>${tr("Раздел")}</label><select id="uKind"><option value="">${tr("как у папки")}</option>${kindOptions("")}</select></div>
     <div class="field"><label>${tr("Теги через запятую")}</label><input type="text" id="uTags" list="tagOptions" placeholder="${tr("анатомия, руки")}"></div>
     <div class="field"><label>${tr("Источник")}</label><input type="text" id="uSrc" placeholder="${tr("необязательно")}"></div>
     <div class="actions"><button data-close>${tr("Отмена")}</button><button class="primary" id="uOk">${tr("Добавить")}</button></div>`,

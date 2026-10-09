@@ -261,3 +261,61 @@ def test_create_folder_and_drag_cards_into_it(page, client):
     assert not page.is_visible("#dropzone")
     assert not page.errors, page.errors
     page.fill("#search", "")
+
+
+def test_custom_section_create_drag_rename_export_delete(page, client, monkeypatch):
+    from conftest import TMP
+    from refis import packs, server
+    monkeypatch.setattr(packs, "packs_dir", lambda: TMP / "packs-sec")
+    monkeypatch.setattr(server, "_reveal", lambda p: None)
+    toasts = "document.querySelector('#toasts').innerText"
+    page.click("#mainNav [data-page=library]")
+    page.click("#views [data-add-section]")
+    page.wait_for_function("document.activeElement?.id === 'sName'")
+    page.fill("#sName", "Пейзажи")
+    page.click("#sColors [data-c='#ff6b8b']")
+    page.click("#sOk")
+    page.wait_for_function(f"{toasts}.includes('Раздел создан')", timeout=10000)
+    btn = page.locator("#views [data-section]", has_text="Пейзажи")
+    assert btn.is_visible() and "active" in btn.get_attribute("class")
+    key = btn.get_attribute("data-view")
+    assert next(s for s in client.get("/api/sections").json() if s["key"] == key)["color"] == "#ff6b8b"
+
+    page.click("#views [data-view=all]")
+    page.fill("#search", "pose_a")
+    page.wait_for_timeout(900)
+    mid = int(page.locator(".card").first.get_attribute("data-id"))
+    page.locator(".card").first.drag_to(btn)
+    page.wait_for_function(f"{toasts}.includes('Пейзажи')", timeout=10000)
+    page.wait_for_timeout(500)
+    assert client.get(f"/api/media/{mid}").json()["kind"] == key
+    color = page.eval_on_selector(f'.card[data-id="{mid}"] .dot.kind', "e => getComputedStyle(e).backgroundColor")
+    assert color == "rgb(255, 107, 139)"
+
+    btn.click(button="right")
+    page.click("#ctxmenu button:has-text('Переименовать')")
+    page.wait_for_function("document.activeElement?.id === 'sName'")
+    page.fill("#sName", "Природа")
+    page.click("#sOk")
+    page.wait_for_timeout(1000)
+    sec = page.locator(f'#views [data-view="{key}"]')
+    assert "Природа" in sec.inner_text()
+
+    sec.click(button="right")
+    page.click("#ctxmenu button:has-text('Экспорт раздела')")
+    page.wait_for_selector("#kName")
+    page.click("#kOk")
+    page.wait_for_function(f"{toasts}.includes('Набор сохранён')", timeout=10000)
+    assert list((TMP / "packs-sec").glob("*.refis"))
+
+    sec.click(button="right")
+    page.click("#ctxmenu button:has-text('Удалить раздел')")
+    page.wait_for_selector("#dOk")
+    page.select_option("#dTo", "ref")
+    page.click("#dOk")
+    page.wait_for_function(f"{toasts}.includes('Раздел удалён')", timeout=10000)
+    page.wait_for_timeout(500)
+    assert not page.locator(f'#views [data-view="{key}"]').count()
+    assert client.get(f"/api/media/{mid}").json()["kind"] == "ref"
+    assert not page.errors, page.errors
+    page.fill("#search", "")

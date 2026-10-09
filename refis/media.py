@@ -292,7 +292,7 @@ def register_file(conn, folder, path: str, kind: str = "", tags=(), source: str 
     mid = conn.execute(
         "INSERT INTO media(folder_id, path, name, ext, type, kind, size, mtime, qhash, source, added_at)"
         " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-        (folder["id"], path, name, ext.lower().lstrip("."), mtype, kind if kind in db.KINDS else folder["kind"],
+        (folder["id"], path, name, ext.lower().lstrip("."), mtype, kind if kind in db.kinds() else folder["kind"],
          st.st_size, st.st_mtime, quick_hash(path, st.st_size), source, time.time())).lastrowid
     for t in tags:
         t = db.normalize_tag(t)

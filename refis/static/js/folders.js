@@ -1,6 +1,6 @@
 // Папки: дерево подпапок в боковой панели, свои новые папки и перемещение файлов между ними.
 import { tr } from "./i18n.js";
-import { $, $$, api, esc, store, toast, menu, modal, emit, files, KINDS } from "./util.js";
+import { $, $$, api, esc, store, toast, menu, modal, emit, files, KIND_PLURAL } from "./util.js";
 import { state, load, loadFolders, loadTags, folderDialog, folderSettingsDialog, reloadKeepSelection } from "./library.js";
 import { exportPackDialog } from "./packs.js";
 
@@ -179,8 +179,8 @@ export async function createFolderDialog({ fid = 0, sub = "", ids = [] } = {}) {
     <div id="nNew">
       <div class="field"><label>${tr("Расположение на диске")}</label>
         <div class="row" style="flex-wrap:nowrap"><input type="text" id="nParent">${native ? `<button id="nPick">${tr("Обзор…")}</button>` : ""}</div></div>
-      <div class="field"><label>${tr("Что в ней по умолчанию")}</label>
-        <select id="nKind">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+      <div class="field"><label>${tr("Раздел для её файлов")}</label>
+        <select id="nKind">${Object.entries(KIND_PLURAL).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
     </div>
     <div class="actions"><button data-close>${tr("Отмена")}</button>
       <button class="primary" id="nOk">${ids.length ? `${tr("Создать и переместить")} ${files(ids.length)}` : tr("Создать")}</button></div>`,

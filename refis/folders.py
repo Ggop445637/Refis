@@ -115,7 +115,7 @@ def register_folder(conn, path: str, kind: str, scan: bool = True) -> int:
     path = os.path.abspath(os.path.expanduser(path.strip().strip('"')))
     if not os.path.isdir(path):
         raise HTTPException(400, tr("Папка не найдена: {path}", path=path))
-    if kind not in db.KINDS:
+    if kind not in db.kinds():
         raise HTTPException(400, tr("Неизвестный тип"))
     for r in conn.execute("SELECT path FROM folders"):
         a, b = os.path.normcase(r["path"]), os.path.normcase(path)

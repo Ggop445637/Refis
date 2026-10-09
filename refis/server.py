@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .i18n import tr
-from . import __version__, db, folders as folders_mod, media, organize, packs, pinterest, profile, security, system
+from . import __version__, db, folders as folders_mod, media, organize, packs, sections, pinterest, profile, security, system
 
 STATIC = Path(__file__).resolve().parent / "static"
 
@@ -159,7 +159,7 @@ def add_folder(f: FolderIn):
 def patch_folder(fid: int, p: FolderPatch):
     conn = db.connect()
     if p.kind is not None:
-        if p.kind not in db.KINDS:
+        if p.kind not in db.kinds():
             raise HTTPException(400, tr("Неизвестный тип"))
         conn.execute("UPDATE folders SET kind = ? WHERE id = ?", (p.kind, fid))
         if p.apply_kind:
@@ -205,7 +205,7 @@ def list_media(q: str = "", kind: str = "", type: str = "", folder: int = 0, sub
     exc += [db.normalize_tag(t) for t in ntags.split(",") if t.strip()]
     where, args = [], []
     where.append("m.missing = 1" if missing else "m.missing = 0")
-    if kind in db.KINDS:
+    if kind in db.kinds():
         where.append("m.kind = ?"); args.append(kind)
     if type in ("image", "video"):
         where.append("m.type = ?"); args.append(type)
@@ -276,7 +276,7 @@ def patch_media(mid: int, p: MediaPatch):
     conn = db.connect()
     fields = p.model_dump(exclude_none=True)
     tags = fields.pop("tags", None)
-    if "kind" in fields and fields["kind"] not in db.KINDS:
+    if "kind" in fields and fields["kind"] not in db.kinds():
         raise HTTPException(400, tr("Неизвестный тип"))
     if "rating" in fields:
         fields["rating"] = max(0, min(5, fields["rating"]))
@@ -317,7 +317,7 @@ def bulk(b: Bulk):
                 if r:
                     conn.executemany("DELETE FROM media_tags WHERE media_id = ? AND tag_id = ?",
                                      [(i, r["id"]) for i in b.ids])
-            if b.kind in db.KINDS:
+            if b.kind in db.kinds():
                 conn.executemany("UPDATE media SET kind = ? WHERE id = ?", [(b.kind, i) for i in b.ids])
             if b.favorite is not None:
                 conn.executemany("UPDATE media SET favorite = ? WHERE id = ?",
@@ -775,4 +775,5 @@ app.include_router(profile.router)
 app.include_router(pinterest.router)
 app.include_router(packs.router)
 app.include_router(folders_mod.router)
+app.include_router(sections.router)
 app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")

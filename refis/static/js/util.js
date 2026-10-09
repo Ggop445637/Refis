@@ -1,8 +1,27 @@
 // Общие помощники: DOM, API, уведомления, диалоги, меню, буфер обмена.
 import { tr, plural } from "./i18n.js";
 
-export const KINDS = { ref: tr("Референс"), own: tr("Моя работа"), tutorial: tr("Туториал"), other: tr("Прочее") };
-export const KIND_PLURAL = { ref: tr("Референсы"), own: tr("Мои работы"), tutorial: tr("Туториалы"), other: tr("Прочее") };
+// Разделы библиотеки. Встроенные подписываются по языку, свои — как назвал пользователь (см. applySections).
+const BUILTIN = {
+  ref: [tr("Референс"), tr("Референсы")], own: [tr("Моя работа"), tr("Мои работы")],
+  tutorial: [tr("Туториал"), tr("Туториалы")], other: [tr("Прочее"), tr("Прочее")],
+};
+export const KINDS = Object.fromEntries(Object.entries(BUILTIN).map(([k, v]) => [k, v[0]]));
+export const KIND_PLURAL = Object.fromEntries(Object.entries(BUILTIN).map(([k, v]) => [k, v[1]]));
+export const SECTIONS = [];
+
+export function applySections(list) {
+  SECTIONS.splice(0, SECTIONS.length, ...list);
+  [KINDS, KIND_PLURAL].forEach((o) => Object.keys(o).forEach((k) => delete o[k]));
+  for (const s of list) {
+    KINDS[s.key] = s.name || BUILTIN[s.key]?.[0] || s.key;
+    KIND_PLURAL[s.key] = s.name || BUILTIN[s.key]?.[1] || s.key;
+  }
+  let st = document.getElementById("sectionColors");
+  if (!st) { st = document.createElement("style"); st.id = "sectionColors"; document.head.appendChild(st); }
+  const safe = list.filter((s) => /^[a-z0-9]+$/i.test(s.key) && /^#[0-9a-f]{6}$/i.test(s.color));
+  st.textContent = `:root{${safe.map((s) => `--k-${s.key}:${s.color};`).join("")}}` + safe.map((s) => `.k-${s.key}{background:${s.color}}`).join("");
+}
 
 export const $ = (s, el = document) => el.querySelector(s);
 export const $$ = (s, el = document) => [...el.querySelectorAll(s)];

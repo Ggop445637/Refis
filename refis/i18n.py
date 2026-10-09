@@ -104,4 +104,8 @@ EN = {
     "Набор не найден — откройте файл ещё раз": "Pack not found — open the file again",
     "Идёт сканирование — попробуйте через минуту": "A scan is running — try again in a minute",
     "Не удалось создать папку: {err}": "Couldn't create the folder: {err}",
+    "Раздел «{name}» уже есть": "The section “{name}” already exists", "Раздел не найден": "Section not found",
+    "Неверный цвет": "Invalid color", "Выберите другой раздел для файлов": "Choose another section for the files",
+    "Этот раздел нужен приложению — его можно переименовать, но не удалить": "The app relies on this section — you can rename it, but not delete it",
+    "Референсы": "References", "Мои работы": "My works", "Туториалы": "Tutorials", "Прочее": "Other", "Раздел": "Section",
 }

@@ -169,7 +169,7 @@ def discover():
 
 def guess_kind(name: str) -> str:
     n = name.lower()
-    if re.search(r"(tutor|урок|курс|course|lesson|обуч|разбор)", n):
+    if re.search(r"(tutor|урок|курс|course|lesson|обуч|разбор)", n) and "tutorial" in db.kinds():
         return "tutorial"
     if re.search(r"(мои|my|own|арты|arts|работ|works|portfolio|портфол|sketchbook|скетчбук)", n):
         return "own"
