@@ -21,13 +21,25 @@ export function store(key, val) {
   } catch { return null; }
 }
 
-export async function api(path, opts = {}) {
-  const o = { ...opts };
+let tokenPromise = null;
+/** Токен сессии: без него сервер не примет изменяющие запросы (защита от чужих сайтов). */
+function sessionToken(refresh = false) {
+  if (!tokenPromise || refresh) tokenPromise = fetch("/api/session").then((r) => r.json()).then((d) => d.token);
+  return tokenPromise;
+}
+
+export async function api(path, opts = {}, retry = true) {
+  const o = { ...opts, headers: { ...(opts.headers || {}) } };
   if (o.body && !(o.body instanceof FormData)) {
     o.body = JSON.stringify(o.body);
-    o.headers = { "Content-Type": "application/json" };
+    o.headers["Content-Type"] = "application/json";
   }
+  if (o.method && o.method !== "GET") o.headers["X-Refis-Token"] = await sessionToken();
   const r = await fetch("/api" + path, o);
+  if (r.status === 403 && retry && o.method && o.method !== "GET") {
+    await sessionToken(true); // сервер перезапускался — берём новый токен
+    return api(path, opts, false);
+  }
   if (!r.ok) {
     let msg = r.statusText;
     try { msg = (await r.json()).detail || msg; } catch {}

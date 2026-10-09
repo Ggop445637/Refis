@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import db, media, organize, pinterest
+from . import __version__, db, media, organize, pinterest, security
 
 STATIC = Path(__file__).resolve().parent / "static"
 
@@ -36,7 +36,14 @@ async def lifespan(_app):
     yield
 
 
-app = FastAPI(title="Refis", lifespan=lifespan)
+app = FastAPI(title="Refis", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+app.middleware("http")(security.guard)
+
+
+@app.get("/api/session")
+def session():
+    """Токен для изменяющих запросов. Чужие сайты прочитать ответ не могут (нет CORS)."""
+    return {"token": security.TOKEN, "version": __version__}
 
 
 # ---------------------------------------------------------------- helpers

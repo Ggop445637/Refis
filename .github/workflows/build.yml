@@ -10,7 +10,27 @@ permissions:
   contents: write
 
 jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Зависимости
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+      - name: Проверка кода
+        run: |
+          python -m pyflakes refis tests tools
+          for f in refis/static/js/*.js; do node --check "$f"; done
+      - name: Тесты
+        run: python -m pytest -q
+
   windows:
+    needs: tests
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

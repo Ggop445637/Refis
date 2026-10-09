@@ -5,6 +5,7 @@ import socket
 import sys
 import threading
 import time
+import urllib.error
 import urllib.request
 import webbrowser
 
@@ -68,6 +69,12 @@ def selftest(url: str) -> int:
                 if path.endswith(".js"):
                     assert "javascript" in r.headers.get("Content-Type", ""), r.headers.get("Content-Type")
         assert media.ffmpeg_exe(), "ffmpeg не найден"
+        req = urllib.request.Request(url + "/api/scan", method="POST")
+        try:
+            urllib.request.urlopen(req, timeout=10)
+            raise AssertionError("POST без токена должен отклоняться")
+        except urllib.error.HTTPError as e:
+            assert e.code == 403, e.code
         print("SELFTEST OK")
         return 0
     except Exception as e:
