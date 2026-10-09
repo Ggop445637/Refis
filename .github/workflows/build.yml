@@ -106,7 +106,7 @@ jobs:
 
       - name: Описание релиза из CHANGELOG
         if: steps.rel.outputs.publish == 'true'
-        run: python tools/changelog_section.py ${{ steps.ver.outputs.version }} > dist/notes.md
+        run: python tools/changelog_section.py ${{ steps.ver.outputs.version }} dist/notes.md
 
       - name: Публикация релиза
         if: steps.rel.outputs.publish == 'true'

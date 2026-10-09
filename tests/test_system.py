@@ -93,3 +93,15 @@ def test_restore_rejects_bad_archives(client, tmp_path):
         z.writestr("../../escape.txt", "x")
     r = client.post("/api/restore", files={"file": ("evil.zip", evil.read_bytes(), "application/zip")})
     assert r.status_code == 400
+
+
+def test_release_notes_on_windows_console(tmp_path):
+    """Описание релиза собирается и при консоли cp1252, как на сборочной машине Windows."""
+    out = tmp_path / "notes.md"
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252"}
+    from refis import __version__
+    r = subprocess.run([sys.executable, str(ROOT / "tools" / "changelog_section.py"), __version__, str(out)],
+                       capture_output=True, text=True, env=env)
+    assert r.returncode == 0, r.stderr
+    text = out.read_text(encoding="utf-8")
+    assert "SmartScreen" in text and len(text) > 200  # раздел версии найден в CHANGELOG.md
