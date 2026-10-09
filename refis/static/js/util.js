@@ -155,13 +155,17 @@ export function modal(html, onReady) {
     if (closed) return;
     closed = true;
     m.classList.add("closing");
-    setTimeout(() => { if (m.classList.contains("closing")) { m.hidden = true; m.classList.remove("closing"); } }, 170);
-    // после текущего события: иначе Enter, закрывший окно, «нажмёт» кнопку, которая его открыла
     const back = m._opener, seq = modalSeq;
+    const restore = () => {
+      // если за это время не открыли новое окно, а фокус остался в окне или «повис» — возвращаем на место
+      const a = document.activeElement;
+      if (seq === modalSeq && back?.isConnected && back !== document.body && (!a || a === document.body || $(".mbox", m).contains(a))) {
+        back.focus({ preventScroll: true });
+      }
+    };
+    setTimeout(() => { if (m.classList.contains("closing")) { m.hidden = true; m.classList.remove("closing"); } restore(); }, 170);
     m._opener = null;
-    setTimeout(() => { // если за это время не открыли новое окно — фокус обратно
-      if (seq === modalSeq && back?.isConnected && back !== document.body) back.focus({ preventScroll: true });
-    }, 0);
+    setTimeout(restore, 0); // после текущего события: иначе Enter, закрывший окно, «нажмёт» кнопку, которая его открыла
   };
   m._close = close;
   $$("[data-close]", m).forEach((b) => (b.onclick = close));

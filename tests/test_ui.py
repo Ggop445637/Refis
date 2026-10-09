@@ -241,6 +241,7 @@ def test_custom_section_create_drag_rename_export_delete(page, client, monkeypat
     page.click("#sColors [data-c='#ff6b8b']")
     page.click("#sOk")
     page.wait_for_function(f"{toasts}.includes('Раздел создан')", timeout=10000)
+    page.wait_for_selector("#views [data-section]:has-text('Пейзажи')")  # раздел появляется после обновления списка
     btn = page.locator("#views [data-section]", has_text="Пейзажи")
     assert btn.is_visible() and "active" in btn.get_attribute("class")
     key = btn.get_attribute("data-view")

@@ -80,9 +80,9 @@ def test_dialog_traps_focus_and_returns_it(page):
     page.keyboard.press("Shift+Tab")
     assert page.evaluate("() => document.querySelector('#modal .mbox').contains(document.activeElement)")
     page.keyboard.press("Escape")
-    page.wait_for_timeout(300)
-    assert page.evaluate("() => document.activeElement.id") == "saveSearch"
-    assert not page.is_visible("#modal")
+    page.wait_for_function("document.activeElement?.id === 'saveSearch'", timeout=3000)
+    page.wait_for_selector("#modal", state="hidden", timeout=3000)
+    assert page.evaluate("() => document.activeElement.id") == "saveSearch"  # и после анимации закрытия
 
 
 def test_enter_in_prompt_does_not_reopen_dialog(page):

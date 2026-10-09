@@ -19,8 +19,16 @@ COLLECT = r"""() => {
     if (s.visibility === 'hidden' || +s.opacity === 0) continue;
     let op = 1; for (let e = el; e; e = e.parentElement) op *= +getComputedStyle(e).opacity;
     if (op < .05) continue;
-    const range = document.createRange(); range.selectNodeContents(el);
-    const r = range.getBoundingClientRect();
+    // рамка только собственного текста элемента, без вложенных значков и бейджей
+    let r = null;
+    for (const n of el.childNodes) {
+      if (n.nodeType !== 3 || !n.textContent.trim()) continue;
+      const range = document.createRange(); range.selectNodeContents(n);
+      const b = range.getBoundingClientRect();
+      r = r ? { left: Math.min(r.left, b.left), top: Math.min(r.top, b.top), right: Math.max(r.right, b.right), bottom: Math.max(r.bottom, b.bottom) } : { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
+    }
+    if (!r) continue;
+    r.width = r.right - r.left; r.height = r.bottom - r.top;
     if (r.width < 2 || r.height < 2 || r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) continue;
     let clipText = false;
     for (let e = el; e && e !== document.body; e = e.parentElement) { const es = getComputedStyle(e); if (es.webkitBackgroundClip === 'text' || es.backgroundClip === 'text') { clipText = true; break; } }
