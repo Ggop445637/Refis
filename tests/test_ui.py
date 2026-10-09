@@ -101,3 +101,41 @@ def test_tag_editor_typing(page):
     page.wait_for_timeout(500)
     assert "тест-тег" in page.inner_text("#details .tagedit")
     assert not page.errors, page.errors
+
+
+def test_delete_from_viewer_moves_to_next(page, client, monkeypatch):
+    import shutil
+
+    from PIL import Image
+
+    from conftest import TMP, wait_scan
+    from refis import media
+    lib, trash = TMP / "ui-trash", TMP / "ui-bin"
+    lib.mkdir()
+    trash.mkdir()
+    for n in ("uitrash_a", "uitrash_b"):
+        Image.new("RGB", (300, 300), "purple").save(lib / f"{n}.jpg")
+    monkeypatch.setattr(media, "trash_file", lambda p: shutil.move(p, trash))
+    before = client.get("/api/status").json()["total"]
+    folder = client.post("/api/folders", json={"path": str(lib), "kind": "ref"}).json()
+    wait_scan(client, before + 2)
+
+    page.click("#mainNav [data-page=library]")
+    page.fill("#search", "uitrash")
+    page.wait_for_timeout(900)
+    assert page.locator(".card").count() == 2
+    page.locator(".card").first.dblclick()
+    page.wait_for_timeout(700)
+    first = page.inner_text("#vTitle b")
+    page.keyboard.press("Delete")
+    page.wait_for_timeout(300)
+    page.click("#mOk")
+    page.wait_for_timeout(1200)
+    assert not (lib / f"{first}.jpg").exists() and (trash / f"{first}.jpg").exists()
+    assert page.is_visible("#viewer") and page.inner_text("#vTitle b") not in ("", first)
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(600)
+    assert page.locator(".card").count() == 1
+    assert not page.errors, page.errors
+    page.fill("#search", "")
+    client.delete(f"/api/folders/{folder['id']}")

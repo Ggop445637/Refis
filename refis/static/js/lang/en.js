@@ -293,4 +293,9 @@ export default {
   "Что сделать? Поиск по командам, тегам, доскам…": "What do you want to do? Search commands, tags, boards…", "Здесь нет картинок или видео": "No images or videos here",
   "Отпустите, чтобы добавить": "Drop to add", "Картинка скопирована — вставьте её в редактор (Ctrl+V)": "Image copied — paste it into your editor (Ctrl+V)",
   "Не удалось скопировать картинку": "Couldn't copy the image", "Скопировано": "Copied",
+  "Удалить в Корзину": "Move to Recycle Bin", "Удалить в Корзину (Delete)": "Move to Recycle Bin (Delete)",
+  "Удалить файл в Корзину?": "Move the file to the Recycle Bin?", "Удалено в Корзину": "Moved to Recycle Bin",
+  "Не удалось удалить": "Couldn't delete", "Возможно, файл открыт в другой программе.": "The file may be open in another program.",
+  "Файлы переместятся в Корзину и исчезнут из Refis вместе с тегами и заметками. Вернуть файл можно из Корзины, но теги придётся ставить заново.":
+    "The files will go to the Recycle Bin and disappear from Refis along with their tags and notes. You can restore a file from the Recycle Bin, but you'll need to tag it again.",
 };

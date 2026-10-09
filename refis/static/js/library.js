@@ -302,6 +302,8 @@ grid.addEventListener("contextmenu", (e) => {
     [tr("В избранное"), () => bulk({ ids, favorite: true }), "F"],
     [tr("Убрать из избранного"), () => bulk({ ids, favorite: false })],
     ...Object.entries(KINDS).map(([k, v]) => [`${tr("Тип")}: ${v}`, () => bulk({ ids, kind: k })]),
+    "-",
+    [`🗑 ${tr("Удалить в Корзину")}`, () => trashMedia(ids), "Del"],
   ]);
 });
 
@@ -382,7 +384,7 @@ new IntersectionObserver((ents) => {
 function view(id) {
   const card = $(`.card[data-id="${id}"]`);
   openViewer({
-    items: state.items,
+    get items() { return state.items; }, // после удаления список перезагружается целиком
     total: () => state.total,
     loadMore: () => load(false),
     cardEl: (mid) => $(`.card[data-id="${mid}"]`),
@@ -392,6 +394,7 @@ function view(id) {
       scrollToCard(mid);
     },
     onChange: (mid) => { updateCard(mid); refreshSelection(); },
+    onTrash: (mid) => trashMedia([mid]),
   }, id, card);
 }
 
@@ -445,6 +448,7 @@ export async function renderDetails() {
       <button id="dBoard">＋ ${tr("Доска")}</button>
     </div>
     <div class="row"><button id="dReveal">${tr("Показать в проводнике")}</button><button id="dOpen">${tr("Открыть в программе")}</button></div>
+    ${m.missing ? "" : `<div class="row"><button id="dTrash" class="danger" title="Delete">🗑 ${tr("Удалить в Корзину")}</button></div>`}
     <div class="meta">
       ${m.width ? `<span>${tr("Размер")}</span><span>${m.width}×${m.height}</span>` : ""}
       ${m.duration ? `<span>${tr("Длина")}</span><span>${fmtDur(m.duration)}</span>` : ""}
@@ -495,6 +499,8 @@ export async function renderDetails() {
   $("#dReveal").onclick = () => api(`/media/${id}/reveal`, { method: "POST" });
   $("#dOpen").onclick = () => api(`/media/${id}/open`, { method: "POST" });
   $$(".dups li", d).forEach((li) => (li.onclick = () => api(`/media/${li.dataset.id}/reveal`, { method: "POST" })));
+  const tb = $("#dTrash");
+  if (tb) tb.onclick = () => trashMedia([id]);
   const f = $("#dForget");
   if (f) f.onclick = async () => { await bulk({ ids: [id], forget: true }); state.selected.clear(); renderDetails(); };
 }
@@ -517,7 +523,8 @@ function renderBulk(ids) {
       <div class="row stars">${[1, 2, 3, 4, 5].map((n) => `<button data-r="${n}">★</button>`).join("")}<button data-r="0" class="mini ghost">${tr("сброс")}</button></div></div>
     <div class="row"><button id="bFav">♥ ${tr("В избранное")}</button><button id="bUnfav">${tr("Убрать из избранного")}</button></div>
     <div class="row"><button id="bPractice" class="primary">⏱ ${tr("Тренировка")}</button><button id="bBoard">＋ ${tr("На доску")}</button></div>
-    <div class="row"><button id="bForget" class="danger" title="${tr("Файлы на диске останутся")}">${tr("Убрать из каталога")}</button></div>`;
+    <div class="row"><button id="bTrash" class="danger" title="Delete">🗑 ${tr("Удалить в Корзину")}</button>
+      <button id="bForget" class="ghost" title="${tr("Файлы на диске останутся")}">${tr("Убрать из каталога")}</button></div>`;
   const add = $("#bAdd");
   add.onkeydown = async (e) => {
     if (e.key !== "Enter" && e.key !== ",") return;
@@ -539,6 +546,7 @@ function renderBulk(ids) {
   $("#bUnfav").onclick = () => bulk({ ids, favorite: false });
   $("#bPractice").onclick = () => practiceDialog({ ids });
   $("#bBoard").onclick = () => addToBoardDialog(ids);
+  $("#bTrash").onclick = () => trashMedia(ids);
   $("#bForget").onclick = () => confirmDialog(
     tr("Убрать из каталога?"),
     `${files(ids.length)} ${tr("исчезнут из Refis вместе с тегами и заметками. Сами файлы на диске останутся, а при следующем сканировании появятся снова, но уже без тегов.")}`,
@@ -547,12 +555,34 @@ function renderBulk(ids) {
 
 export async function bulk(body) {
   await api("/media/bulk", { method: "POST", body });
+  await reloadKeepSelection();
+}
+
+async function reloadKeepSelection() {
   const keep = new Set(state.selected);
   $("#details").dataset.stale = "1";
   await Promise.all([load(true), loadTags()]);
   state.selected = new Set([...keep].filter((id) => state.items.some((i) => i.id === id)));
   refreshSelection();
   renderDetails();
+}
+
+// Удаление в Корзину Windows. Возвращает true, если хоть что-то удалено (просмотрщику — чтобы листать дальше).
+export function trashMedia(ids) {
+  if (!ids.length) return Promise.resolve(false);
+  return new Promise((resolve) => confirmDialog(
+    ids.length === 1 ? tr("Удалить файл в Корзину?") : `${tr("Удалить в Корзину")}: ${files(ids.length)}?`,
+    tr("Файлы переместятся в Корзину и исчезнут из Refis вместе с тегами и заметками. Вернуть файл можно из Корзины, но теги придётся ставить заново."),
+    async () => {
+      const res = await api("/media/trash", { method: "POST", body: { ids } });
+      res.ids.forEach((id) => state.selected.delete(id));
+      if (res.ids.length) toast(`${tr("Удалено в Корзину")}: ${files(res.ids.length)}`);
+      if (res.failed.length) {
+        toast(`${tr("Не удалось удалить")}: ${res.failed.map((f) => f.name).join(", ")}. ${tr("Возможно, файл открыт в другой программе.")}`, { life: 8000 });
+      }
+      await Promise.all([reloadKeepSelection(), loadFolders()]);
+      resolve(res.ids.length > 0);
+    }, tr("Удалить")));
 }
 
 // ---------- редактор тегов
@@ -914,6 +944,7 @@ export function libraryKey(e) {
     setTimeout(() => $("#details .tagedit input")?.focus(), 50); return true;
   }
   if (k === "i" || k === "ш") { toggleDetails(); return true; }
+  if (k === "Delete" && ids.length) { trashMedia(ids); return true; }
   return false;
 }
 

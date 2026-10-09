@@ -309,9 +309,7 @@ def bulk(b: Bulk):
     conn.execute("BEGIN")
     try:
         if b.forget:
-            conn.executemany("DELETE FROM media WHERE id = ?", [(i,) for i in b.ids])
-            for i in b.ids:
-                media.thumb_path(i).unlink(missing_ok=True)
+            _drop_media(conn, b.ids)
         else:
             for t in {db.normalize_tag(t) for t in b.add_tags} - {""}:
                 tid = db.tag_id(conn, t)
@@ -335,6 +333,42 @@ def bulk(b: Bulk):
         conn.execute("ROLLBACK")
         raise
     return {"ok": True}
+
+
+def _drop_media(conn, ids: list[int]) -> None:
+    """Убирает записи из каталога вместе с превью; пины с Pinterest больше не ссылаются на них."""
+    conn.executemany("DELETE FROM media WHERE id = ?", [(i,) for i in ids])
+    conn.executemany("UPDATE pins SET status = 'hidden', media_id = NULL WHERE media_id = ?", [(i,) for i in ids])
+    for i in ids:
+        media.thumb_path(i).unlink(missing_ok=True)
+
+
+class Ids(BaseModel):
+    ids: list[int]
+
+
+@app.post("/api/media/trash")
+def trash(b: Ids):
+    """Удаляет файлы в Корзину (их можно вернуть) и убирает их из каталога."""
+    conn = db.connect()
+    done, failed = [], []
+    for mid in dict.fromkeys(b.ids):
+        r = conn.execute("SELECT path FROM media WHERE id = ?", (mid,)).fetchone()
+        if not r:
+            continue
+        try:
+            if os.path.exists(r["path"]):
+                media.trash_file(r["path"])
+        except Exception as e:  # файл открыт в другой программе, нет прав и т. п.
+            failed.append({"id": mid, "name": os.path.basename(r["path"]), "error": str(e)[:200]})
+            continue
+        done.append(mid)
+    if done:
+        conn.execute("BEGIN")
+        _drop_media(conn, done)
+        db.cleanup_tags(conn)
+        conn.execute("COMMIT")
+    return {"ids": done, "failed": failed}
 
 
 @app.get("/api/thumb/{mid}")

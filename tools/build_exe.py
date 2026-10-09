@@ -53,6 +53,7 @@ def main() -> None:
         "--add-data", f"{ROOT / 'refis' / 'static'}{sep}refis/static",
         "--collect-all", "imageio_ffmpeg",
         "--collect-submodules", "uvicorn",
+        "--collect-submodules", "send2trash",  # платформенный модуль выбирается при импорте
         "--distpath", str(ROOT / "dist"),
         "--workpath", str(ROOT / "build"),
         "--specpath", str(ROOT / "build"),

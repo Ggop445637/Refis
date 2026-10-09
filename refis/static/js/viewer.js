@@ -77,6 +77,7 @@ function show(fromEl, dir) {
   const total = V.src.total?.() ?? V.src.items.length;
   $("#vTitle").innerHTML = `<span>${idx + 1} / ${total}</span><b>${esc(it.name || "")}</b>${it.tags?.length ? `<span>${esc(it.tags.join(" · "))}</span>` : ""}`;
   $('[data-act="fav"]').textContent = it.favorite ? "♥" : "♡";
+  $('[data-act="trash"]').hidden = !!it.external || !V.src.onTrash;
   syncButtons();
   if (!it.external) api(`/media/${it.id}/viewed`, { method: "POST" }).catch(() => {});
 
@@ -276,6 +277,18 @@ async function act(a) {
       break;
     }
     case "board": if (it.external) return toast(tr("Сначала сохраните картинку в библиотеку")); addToBoardDialog([it.id]); break;
+    case "trash": {
+      if (it.external || !V.src.onTrash) return;
+      const list = V.src.items, idx = list.indexOf(it);
+      const near = [list[idx + 1], list[idx - 1]].filter(Boolean).map((i) => i.id);
+      if (!(await V.src.onTrash(it.id))) return;
+      const next = near.find((id) => V.src.items.some((i) => i.id === id));
+      if (next == null) return close();
+      V.id = next;
+      V.src.onNavigate?.(next);
+      show(null, 1);
+      break;
+    }
     case "fav": {
       if (it.external) return;
       it.favorite = it.favorite ? 0 : 1;
@@ -406,7 +419,7 @@ export function viewerKey(e) {
     Escape: "close", ArrowLeft: "prev", ArrowRight: "next",
     h: "mirror", "р": "mirror", g: "gray", "п": "gray", b: "blur", "и": "blur", s: "grid", "ы": "grid",
     r: "rotate", "к": "rotate", f: "fav", "а": "fav", "0": "fit", l: "loop", "д": "loop",
-    ",": "back", "б": "back", ".": "fwd", "ю": "fwd", i: "pick", "ш": "pick",
+    ",": "back", "б": "back", ".": "fwd", "ю": "fwd", i: "pick", "ш": "pick", Delete: "trash",
   };
   if (map[k]) { act(map[k]); return true; }
   return true; // просмотр модальный — остальные клавиши не уходят в сетку

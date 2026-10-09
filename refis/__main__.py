@@ -122,6 +122,8 @@ def selftest(url: str) -> int:
                 if path.endswith(".js"):
                     assert "javascript" in r.headers.get("Content-Type", ""), r.headers.get("Content-Type")
         assert media.ffmpeg_exe(), "ffmpeg не найден"
+        from send2trash import send2trash
+        assert callable(send2trash), "send2trash не попал в сборку"
         req = urllib.request.Request(url + "/api/scan", method="POST")
         try:
             urllib.request.urlopen(req, timeout=10)

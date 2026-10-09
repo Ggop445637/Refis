@@ -169,6 +169,12 @@ def probe_video(path: str) -> tuple[float | None, int | None, int | None]:
     return dur, w, h
 
 
+def trash_file(path: str) -> None:
+    """В Корзину, а не насовсем: случайно удалённый референс можно вернуть."""
+    from send2trash import send2trash
+    send2trash(os.path.normpath(path))
+
+
 def thumb_path(media_id: int) -> Path:
     return db.THUMB_DIR / f"{media_id}.jpg"
 
