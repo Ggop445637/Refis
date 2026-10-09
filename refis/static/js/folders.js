@@ -30,8 +30,9 @@ export function renderFolders(refresh = false) {
     const isOpen = open.has(key(f.id, sub));
     const active = state.folder === f.id && state.sub === sub;
     return `<li data-id="${f.id}" data-sub="${esc(sub)}" class="${active ? "active" : ""}${d ? " subdir" : ""}"
+        role="treeitem" tabindex="0" aria-level="${d ? d.depth + 2 : 1}" aria-selected="${active}" ${kids ? `aria-expanded="${isOpen}"` : ""}
         style="padding-left:${d ? 10 + (d.depth + 1) * 14 : 10}px" title="${esc(d ? join(base(f.path), sub) : f.path)}">
-      <button class="caret${kids ? "" : " none"}" data-toggle tabindex="-1">${isOpen ? "▾" : "▸"}</button>
+      <span class="caret${kids ? "" : " none"}" data-toggle aria-hidden="true">${isOpen ? "▾" : "▸"}</span>
       ${d ? "" : `<i class="dot k-${f.kind}"></i>`}<span class="name">${esc(d ? d.name : base(f.path))}</span>
       <span class="cnt">${d ? d.count || "" : f.count}</span></li>`;
   };
@@ -45,7 +46,13 @@ export function renderFolders(refresh = false) {
       if (parts.slice(0, -1).every((_, i) => open.has(key(f.id, parts.slice(0, i + 1).join("/"))))) html.push(row(f, d));
     }
   }
-  $("#folderlist").innerHTML = html.join("") || `<li class="empty">${tr("Нажмите ＋, чтобы создать или добавить папку")}</li>`;
+  const had = document.activeElement?.closest?.("#folderlist li[data-id]");
+  const focusKey = had && `${had.dataset.id}|${had.dataset.sub}`;
+  $("#folderlist").innerHTML = html.join("") || `<li class="empty" role="none">${tr("Нажмите ＋, чтобы создать или добавить папку")}</li>`;
+  if (focusKey) { // перерисовка не должна сбивать фокус с клавиатуры
+    const li = $$("#folderlist li[data-id]").find((x) => `${x.dataset.id}|${x.dataset.sub}` === focusKey);
+    if (li) li.focus({ preventScroll: true });
+  }
 }
 
 const target = (li) => ({ f: state.folders.find((x) => x.id === +li.dataset.id), sub: li.dataset.sub || "" });
@@ -67,6 +74,17 @@ $("#folderlist").addEventListener("click", async (e) => {
   renderFolders();
   emit("navigate", "library");
   load();
+});
+
+// дерево с клавиатуры, как в Проводнике: → раскрыть, ← свернуть
+$("#folderlist").addEventListener("keydown", (e) => {
+  const li = e.target.closest("li[data-id]");
+  if (!li || (e.key !== "ArrowRight" && e.key !== "ArrowLeft")) return;
+  const exp = li.getAttribute("aria-expanded");
+  if ((e.key === "ArrowRight" && exp === "false") || (e.key === "ArrowLeft" && exp === "true")) {
+    e.preventDefault(); e.stopPropagation();
+    li.querySelector("[data-toggle]").click();
+  }
 });
 
 $("#folderlist").addEventListener("contextmenu", (e) => {

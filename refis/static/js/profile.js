@@ -19,7 +19,7 @@ export async function renderProfile() {
   const name = settings.name || "";
   const since = t.since ? new Date(t.since * 1000).toLocaleDateString(loc(), { month: "long", year: "numeric" }) : null;
   const done = p.achievements.filter((a) => a.done).length;
-  root.innerHTML = `
+  root.innerHTML = `<h1 class="sr-only">${tr("Профиль")}</h1>
     <header class="rise prof-head">
       <div class="avatar">${esc((name || "Х")[0].toUpperCase())}</div>
       <div>
@@ -36,7 +36,7 @@ export async function renderProfile() {
     </div>
 
     <section class="glass chart-card rise" style="--d:5">
-      <h3>${tr("Минуты рисования по неделям")} <small>${tr("последние полгода")}</small></h3>
+      <h2>${tr("Минуты рисования по неделям")} <small>${tr("последние полгода")}</small></h2>
       <div class="bars" id="weekChart"></div>
       <details class="as-table"><summary>${tr("Показать таблицей")}</summary>
         <table><thead><tr><th>${tr("Неделя с")}</th><th>${tr("Минут")}</th><th>${tr("Сессий")}</th></tr></thead><tbody>
@@ -46,14 +46,14 @@ export async function renderProfile() {
 
     <div class="two-col">
       <section class="glass chart-card rise" style="--d:6">
-        <h3>${tr("Любимые темы")} <small>${tr("минуты практики")}</small></h3>
+        <h2>${tr("Любимые темы")} <small>${tr("минуты практики")}</small></h2>
         ${p.topics.length ? `<div class="hbars">${p.topics.map((x, i) => `
           <div class="hbar" style="--i:${i}" data-tag="${esc(x.tag)}" title="${x.sessions} ${plural(x.sessions, "сессия", "сессии", "сессий")}">
             <span class="name">#${esc(x.tag)}</span><span class="track"><i style="--w:${(100 * x.minutes) / Math.max(...p.topics.map((y) => y.minutes), 1)}%"></i></span><span class="val">${hm(x.minutes)}</span></div>`).join("")}</div>`
           : `<p class="muted">${tr("Темы появятся, когда вы порисуете по заданиям или референсу дня.")}</p>`}
       </section>
       <section class="glass chart-card rise" style="--d:7">
-        <h3>${tr("Давно не практиковали")} <small>${tr("больше месяца")}</small></h3>
+        <h2>${tr("Давно не практиковали")} <small>${tr("больше месяца")}</small></h2>
         ${p.neglected.length ? `<div class="tagcloud">${p.neglected.map((x) => `<button data-tag="${esc(x.tag)}">#${esc(x.tag)} <span class="muted">${x.count}</span></button>`).join("")}</div>
           <p class="hint">${tr("Эти темы чаще попадают в «Тему дня» и задания.")}</p>`
           : `<p class="muted">${tr("Вы прошлись по всем крупным темам за последний месяц")} 👏</p>`}
@@ -61,7 +61,7 @@ export async function renderProfile() {
     </div>
 
     <section class="glass chart-card rise" style="--d:8">
-      <h3>${tr("Достижения")} <small>${done} ${tr("из")} ${p.achievements.length}</small></h3>
+      <h2>${tr("Достижения")} <small>${done} ${tr("из")} ${p.achievements.length}</small></h2>
       <div class="achs">${p.achievements.map((a, i) => `
         <div class="ach ${a.done ? "done" : ""}" style="--i:${i};--p:${Math.round(a.progress * 100)}" title="${esc(a.desc)}">
           <div class="medal"><span>${a.icon}</span></div>
@@ -69,11 +69,11 @@ export async function renderProfile() {
         </div>`).join("")}</div>
     </section>
 
-    ${p.own.length ? `<section class="glass strip rise" style="--d:9"><h3>${tr("Мои работы")} <small>${p.library.own} · ${tr("по дате файла")}</small></h3>
+    ${p.own.length ? `<section class="glass strip rise" style="--d:9"><h2>${tr("Мои работы")} <small>${p.library.own} · ${tr("по дате файла")}</small></h2>
       <div class="own-line" id="ownLine">${groupByMonth(p.own)}</div></section>` : ""}
 
     <section class="glass chart-card rise" style="--d:10">
-      <h3>${tr("Последние сессии")}</h3>
+      <h2>${tr("Последние сессии")}</h2>
       ${p.recent.length ? `<div class="sessions">${p.recent.map((r) => `<div class="sess"><span>${new Date(r.ts * 1000).toLocaleString(loc(), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
         <b>${esc(r.prompt || (r.kind === "gesture" ? tr("Наброски") : tr("Задание")))}</b>${r.tag ? `<span class="muted">#${esc(r.tag)}</span>` : ""}
         <span class="muted">${r.kind === "gesture" ? `${r.count} ${tr("шт")} · ` : ""}${hm(r.minutes)}</span></div>`).join("")}</div>`

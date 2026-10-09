@@ -101,12 +101,18 @@ export function toast(text, { action, onAction, life = 2800, swatch, error } = {
     b.onclick = () => { onAction?.(); close(); };
     el.appendChild(b);
   }
+  if (error) el.setAttribute("role", "alert"); // ошибки диктор читает сразу, остальное — вежливо (#toasts aria-live)
   const host = $("#toasts");
   host.appendChild(el);
   while (host.children.length > 4) host.firstElementChild.remove();
-  let t = setTimeout(close, life);
-  el.onmouseenter = () => clearTimeout(t);
-  el.onmouseleave = () => { t = setTimeout(close, 1200); };
+  // с кнопкой — даём время дотянуться до неё и с клавиатуры (WCAG 2.2.1)
+  let t = setTimeout(close, action ? Math.max(life, 6000) : life);
+  const pause = () => clearTimeout(t);
+  const resume = () => { clearTimeout(t); t = setTimeout(close, 1200); };
+  el.onmouseenter = pause;
+  el.onmouseleave = resume;
+  el.addEventListener("focusin", pause);
+  el.addEventListener("focusout", resume);
   function close() {
     el.classList.add("out");
     setTimeout(() => el.remove(), 240);
@@ -115,67 +121,142 @@ export function toast(text, { action, onAction, life = 2800, swatch, error } = {
 
 // ------------------------------------------------------------ модальные окна
 
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+export const focusables = (root) => [...root.querySelectorAll(FOCUSABLE)].filter((e) => e.offsetParent !== null || e === document.activeElement);
+
+/** Tab и Shift+Tab ходят по кругу внутри root — фокус не убегает за окно (как в диалогах Windows). */
+export function trapFocus(root, e) {
+  if (e.key !== "Tab") return false;
+  const list = focusables(root);
+  if (!list.length) { e.preventDefault(); return true; }
+  const i = list.indexOf(document.activeElement);
+  if (e.shiftKey && (i <= 0)) { e.preventDefault(); list[list.length - 1].focus(); return true; }
+  if (!e.shiftKey && (i === -1 || i === list.length - 1)) { e.preventDefault(); list[0].focus(); return true; }
+  return false;
+}
+
+let modalSeq = 0;
 export function modal(html, onReady) {
   const m = $("#modal");
+  const box = $(".mbox", m);
+  // вернём фокус туда, откуда открыли; окно, открытое сразу после другого, помнит исходную кнопку
+  const opener = m.hidden || m.classList.contains("closing") ? document.activeElement : m._opener;
   m.classList.remove("closing");
-  $(".mbox", m).innerHTML = html;
+  box.innerHTML = html;
+  modalSeq++;
+  const h = $("h2", box);
+  if (h) { h.id = `mTitle${modalSeq}`; box.setAttribute("aria-labelledby", h.id); } else box.removeAttribute("aria-labelledby");
+  const p = $(":scope > p", box);
+  if (p) { p.id = `mDesc${modalSeq}`; box.setAttribute("aria-describedby", p.id); } else box.removeAttribute("aria-describedby");
   m.hidden = false;
+  m._opener = opener;
   let closed = false;
   const close = () => {
     if (closed) return;
     closed = true;
     m.classList.add("closing");
-    setTimeout(() => { if (m.classList.contains("closing")) { m.hidden = true; m.classList.remove("closing"); } }, 180);
+    setTimeout(() => { if (m.classList.contains("closing")) { m.hidden = true; m.classList.remove("closing"); } }, 170);
+    // после текущего события: иначе Enter, закрывший окно, «нажмёт» кнопку, которая его открыла
+    const back = m._opener, seq = modalSeq;
+    m._opener = null;
+    setTimeout(() => { // если за это время не открыли новое окно — фокус обратно
+      if (seq === modalSeq && back?.isConnected && back !== document.body) back.focus({ preventScroll: true });
+    }, 0);
   };
   m._close = close;
   $$("[data-close]", m).forEach((b) => (b.onclick = close));
-  onReady?.($(".mbox", m), close);
-  setTimeout(() => $("input[type=text], input[type=number], textarea", m)?.focus(), 30);
+  onReady?.(box, close);
+  setTimeout(() => {
+    if (box.contains(document.activeElement)) return; // окно само выбрало, куда поставить фокус
+    ($("input[type=text], input[type=number], textarea", box) || $(".actions .primary", box) || focusables(box)[0])?.focus();
+  }, 30);
   return close;
 }
+$("#modal").addEventListener("keydown", (e) => trapFocus($("#modal .mbox"), e));
 export const closeModal = () => $("#modal")._close?.();
 export const modalOpen = () => !$("#modal").hidden && !$("#modal").classList.contains("closing");
 
-export function confirmDialog(title, text, onOk, okLabel = tr("Да")) {
+/** Подтверждение. danger — необратимое или опасное действие: красная кнопка, а фокус по умолчанию на «Отмене»,
+ *  чтобы случайный Enter ничего не удалил. */
+export function confirmDialog(title, text, onOk, okLabel = tr("Да"), { danger = false } = {}) {
   modal(`<h2>${esc(title)}</h2><p>${esc(text)}</p>
-    <div class="actions"><button data-close>${tr("Отмена")}</button><button class="primary" id="mOk">${esc(okLabel)}</button></div>`,
-    (box, close) => { $("#mOk", box).onclick = async () => { close(); await onOk(); }; setTimeout(() => $("#mOk", box).focus(), 40); });
+    <div class="actions"><button data-close id="mCancel">${tr("Отмена")}</button><button class="${danger ? "danger strong" : "primary"}" id="mOk">${esc(okLabel)}</button></div>`,
+    (box, close) => {
+      $("#mOk", box).onclick = async () => { close(); await onOk(); };
+      $(danger ? "#mCancel" : "#mOk", box).focus();
+    });
 }
 
 export function promptDialog(title, text, value, onOk) {
-  modal(`<h2>${esc(title)}</h2>${text ? `<p>${esc(text)}</p>` : ""}<input type="text" id="mVal" value="${esc(value)}">
+  modal(`<h2>${esc(title)}</h2>${text ? `<p>${esc(text)}</p>` : ""}<input type="text" id="mVal" value="${esc(value)}" aria-label="${esc(title)}">
     <div class="actions"><button data-close>${tr("Отмена")}</button><button class="primary" id="mOk">${tr("Готово")}</button></div>`,
     (box, close) => {
       const ok = async () => { const v = $("#mVal", box).value.trim(); if (!v) return; close(); await onOk(v); };
       $("#mOk", box).onclick = ok;
-      $("#mVal", box).onkeydown = (e) => { if (e.key === "Enter") ok(); };
-      setTimeout(() => $("#mVal", box).select(), 40);
+      $("#mVal", box).onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); ok(); } };
+      $("#mVal", box).focus();
+      $("#mVal", box).select();
     });
 }
 
 // ------------------------------------------------------------ контекстное меню
 
+let menuOpener = null;
 export function menu(e, items) {
   const m = $("#ctxmenu");
   m.innerHTML = "";
   items.filter(Boolean).forEach((it) => {
-    if (it === "-") { m.appendChild(document.createElement("hr")); return; }
+    if (it === "-") { const hr = document.createElement("hr"); hr.setAttribute("role", "separator"); m.appendChild(hr); return; }
     const [label, fn, key] = it;
     const b = document.createElement("button");
-    b.innerHTML = `<span>${esc(label)}</span>${key ? `<kbd>${esc(key)}</kbd>` : ""}`;
-    b.onclick = () => { m.hidden = true; fn(); };
+    b.setAttribute("role", "menuitem");
+    b.tabIndex = -1;
+    b.innerHTML = `<span>${esc(label)}</span>${key ? `<kbd aria-hidden="true">${esc(key)}</kbd>` : ""}`;
+    b.onclick = () => { closeMenu(false); fn(); };
     m.appendChild(b);
   });
+  menuOpener = document.activeElement;
   m.hidden = false;
   m.style.animation = "none";
   void m.offsetWidth;
   m.style.animation = "";
   const r = m.getBoundingClientRect();
-  m.style.left = Math.min(e.clientX, innerWidth - r.width - 8) + "px";
-  m.style.top = Math.min(e.clientY, innerHeight - r.height - 8) + "px";
+  m.style.left = Math.max(8, Math.min(e.clientX, innerWidth - r.width - 8)) + "px";
+  m.style.top = Math.max(8, Math.min(e.clientY, innerHeight - r.height - 8)) + "px";
+  // открыли с клавиатуры (Shift+F10, клавиша меню) — сразу ставим фокус на первый пункт
+  if (!e.isTrusted || e.type === "keydown" || e.detail === 0) $("button", m)?.focus();
 }
-addEventListener("pointerdown", (e) => { if (!e.target.closest("#ctxmenu")) $("#ctxmenu").hidden = true; }, true);
-addEventListener("blur", () => { $("#ctxmenu").hidden = true; });
+function closeMenu(restore = true) {
+  const m = $("#ctxmenu");
+  if (m.hidden) return;
+  m.hidden = true;
+  const back = menuOpener;
+  if (restore && back?.isConnected) setTimeout(() => back.focus({ preventScroll: true }), 0);
+}
+export const menuOpen = () => !$("#ctxmenu").hidden;
+// меню с клавиатуры: стрелки, Home/End, Esc — как в меню Windows
+addEventListener("keydown", (e) => {
+  if (!menuOpen()) return;
+  const items = [...$$("#ctxmenu button")];
+  const i = items.indexOf(document.activeElement);
+  const go = (j) => { e.preventDefault(); items[(j + items.length) % items.length]?.focus(); };
+  if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); closeMenu(); }
+  else if (e.key === "ArrowDown") go(i + 1);
+  else if (e.key === "ArrowUp") go(i < 0 ? -1 : i - 1);
+  else if (e.key === "Home") go(0);
+  else if (e.key === "End") go(-1);
+  else if (e.key === "Tab") { e.preventDefault(); closeMenu(); }
+  else return;
+  e.stopImmediatePropagation();
+}, true);
+addEventListener("pointerdown", (e) => { if (!e.target.closest("#ctxmenu")) closeMenu(false); }, true);
+addEventListener("blur", () => closeMenu(false));
+
+/** Shift+F10 или клавиша меню: открыть контекстное меню элемента, на котором фокус. */
+export function openContextMenuFor(el) {
+  const r = el.getBoundingClientRect();
+  el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: r.left + Math.min(24, r.width / 2), clientY: r.top + Math.min(r.height, 32), detail: 0 }));
+}
 
 // ------------------------------------------------------------ движение
 

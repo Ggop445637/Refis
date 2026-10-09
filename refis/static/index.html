@@ -38,7 +38,7 @@
   <aside id="sidebar">
     <div class="brand"><img src="img/logo.svg" alt=""><b>Refis</b></div>
 
-    <nav class="nav" id="mainNav">
+    <nav class="nav" id="mainNav" aria-label="Страницы">
       <div class="pill"></div>
       <button data-page="today"><svg class="i"><use href="#i-sun"/></svg>Сегодня</button>
       <button data-page="organize"><svg class="i"><use href="#i-broom"/></svg>Порядок<span class="cnt" id="orgBadge"></span></button>
@@ -48,7 +48,7 @@
       <button data-page="profile"><svg class="i"><use href="#i-user"/></svg>Профиль</button>
     </nav>
 
-    <nav class="nav sub" id="views">
+    <nav class="nav sub" id="views" aria-label="Разделы библиотеки">
       <div class="pill"></div>
       <button data-view="all">Все файлы</button>
       <button data-view="fav">★ Избранное</button>
@@ -69,7 +69,7 @@
 
     <section class="sb-section">
       <h3>Папки <button id="addFolder" class="mini ghost" title="Добавить папку">＋</button></h3>
-      <ul id="folderlist" class="list"></ul>
+      <ul id="folderlist" class="list" role="tree" aria-label="Папки"></ul>
     </section>
 
     <div class="sb-foot">
@@ -85,6 +85,7 @@
 
     <!-- БИБЛИОТЕКА -->
     <section class="page" data-page="library">
+      <h1 class="sr-only">Библиотека</h1>
       <div class="lib-main">
         <header class="toolbar">
           <div class="searchbox">
@@ -128,12 +129,12 @@
         <div id="chips"></div>
         <div class="statusbar"><span id="countText"></span><span id="scanText"></span></div>
         <div id="gridwrap">
-          <div id="grid"></div>
+          <div id="grid" role="listbox" aria-multiselectable="true" aria-label="Файлы" tabindex="0"></div>
           <div id="sentinel"></div>
           <div id="empty" hidden></div>
         </div>
       </div>
-      <aside id="details"></aside>
+      <div id="details" role="region" aria-label="Детали файла"></div>
     </section>
 
     <!-- ПОРЯДОК -->
@@ -152,7 +153,7 @@
 </div>
 
 <!-- ПРОСМОТР -->
-<div id="viewer" class="overlay" hidden>
+<div id="viewer" class="overlay" hidden role="dialog" aria-modal="true" aria-label="Просмотр">
   <div class="vtop chrome">
     <div class="vtitle" id="vTitle"></div>
     <div class="vtools">
@@ -163,6 +164,7 @@
       <button data-act="rotate" title="Повернуть (R)">⟳</button>
       <button data-act="pick" title="Пипетка — взять цвет (I)" id="pickBtn">Пипетка</button>
       <button data-act="copy" title="Копировать картинку (Ctrl+C)">Копир.</button>
+      <button data-act="bg" title="Фон: тёмный, серый, светлый — для оценки цвета (N)">Фон</button>
       <span class="vsep vid-only"></span>
       <button data-act="back" class="vid-only" title="Кадр назад (,)">⏮</button>
       <button data-act="fwd" class="vid-only" title="Кадр вперёд (.)">⏭</button>
@@ -222,11 +224,11 @@
   <aside class="tri-panel" id="triPanel"></aside>
 </div>
 
-<div id="modal" class="overlay modal" hidden><div class="mbox"></div></div>
+<div id="modal" class="overlay modal" hidden><div class="mbox" role="dialog" aria-modal="true"></div></div>
 <div id="palette" class="overlay" hidden></div>
 <div id="dropzone" hidden><div>Отпустите, чтобы добавить</div></div>
-<div id="ctxmenu" hidden></div>
-<div id="toasts"></div>
+<div id="ctxmenu" hidden role="menu"></div>
+<div id="toasts" role="status" aria-live="polite"></div>
 <datalist id="tagOptions"></datalist>
 
 <script type="module" src="js/main.js"></script>

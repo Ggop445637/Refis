@@ -58,8 +58,8 @@ export function translateStatic(root = document.body) {
     const raw = n.nodeValue, key = raw.trim();
     if (key && dict[key]) n.nodeValue = raw.replace(key, dict[key]);
   });
-  root.querySelectorAll("[placeholder], [title]").forEach((el) => {
-    for (const a of ["placeholder", "title"]) {
+  root.querySelectorAll("[placeholder], [title], [aria-label]").forEach((el) => {
+    for (const a of ["placeholder", "title", "aria-label"]) {
       const v = el.getAttribute(a);
       if (v && dict[v]) el.setAttribute(a, dict[v]);
     }

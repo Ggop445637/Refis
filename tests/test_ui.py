@@ -2,44 +2,9 @@
 
 Нужен Playwright с Chromium: pip install playwright && playwright install chromium
 """
-import os
-import socket
-import threading
-import time
-
 import pytest
 
-pw = pytest.importorskip("playwright.sync_api")
-
-
-def free_port():
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
-@pytest.fixture(scope="module")
-def page(client):
-    import uvicorn
-
-    from refis.server import app
-    port = free_port()
-    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
-    threading.Thread(target=server.run, daemon=True).start()
-    while not server.started:
-        time.sleep(0.05)
-    exe = "/opt/pw-browsers/chromium" if os.path.exists("/opt/pw-browsers/chromium") else None
-    with pw.sync_playwright() as p:
-        browser = p.chromium.launch(executable_path=exe)
-        pg = browser.new_page(viewport={"width": 1400, "height": 900})
-        pg.errors = []
-        pg.on("pageerror", lambda e: pg.errors.append(str(e)))
-        pg.on("console", lambda m: m.type == "error" and pg.errors.append(m.text))
-        pg.goto(f"http://127.0.0.1:{port}/")
-        pg.wait_for_timeout(1200)
-        yield pg
-        browser.close()
-    server.should_exit = True
+pytest.importorskip("playwright.sync_api")  # браузер для фикстуры page — в conftest.py
 
 
 @pytest.mark.parametrize("name", ["today", "organize", "library", "boards", "pinterest", "profile", "settings"])

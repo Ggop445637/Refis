@@ -8,7 +8,9 @@ const V = {
   mirror: false, gray: false, blur: false, grid: 0, rot: 0, loop: true,
   scale: 1, x: 0, y: 0, natW: 1, natH: 1, box: null, media: null,
   ab: null, // повтор отрезка видео { a, b } — запоминается для каждого видео
+  bg: "dark", // фон просмотра: dark | gray | light
 };
+const BGS = ["dark", "gray", "light"];
 const root = $("#viewer");
 const stage = $("#vStage");
 
@@ -58,8 +60,13 @@ export function openViewer(source, id, fromEl) {
   V.src = source;
   V.id = id;
   V.mirror = false; // зеркало — временный инструмент, не переносим между открытиями
+  V.opener = document.activeElement;
+  V.bg = store("viewerBg") || "dark";
+  applyBg();
   root.hidden = false;
   V.open = true;
+  root.tabIndex = -1;
+  root.focus({ preventScroll: true }); // клавиатура и диктор — внутри просмотра
   requestAnimationFrame(() => root.classList.add("show"));
   show(fromEl, 0);
 }
@@ -170,10 +177,10 @@ function enter(box, fromEl, dir) {
     const s0 = Math.min(r.width / ew(), r.height / eh());
     const x0 = r.left - sr.left + (r.width - ew() * s0) / 2, y0 = r.top - sr.top + (r.height - eh() * s0) / 2;
     box.animate([{ transform: boxTransform(x0, y0, s0), opacity: .4 }, { transform: boxTransform(f.x, f.y, f.s), opacity: 1 }],
-      { duration: 520, easing: "cubic-bezier(.16,1,.3,1)" });
+      { duration: 333, easing: "cubic-bezier(.16,1,.3,1)" });
   } else if (dir) {
     box.animate([{ transform: `translateX(${dir * 60}px) ` + boxTransform(f.x, f.y, f.s), opacity: 0 }, { transform: boxTransform(f.x, f.y, f.s), opacity: 1 }],
-      { duration: 420, easing: "cubic-bezier(.16,1,.3,1)" });
+      { duration: 250, easing: "cubic-bezier(.16,1,.3,1)" });
   }
 }
 
@@ -191,6 +198,8 @@ export function closeViewer() { close(); }
 function close() {
   if (!V.open) return;
   V.open = false;
+  const back = V.opener;
+  if (back?.isConnected && back !== document.body) setTimeout(() => back.focus({ preventScroll: true }), 0);
   const it = item();
   const card = it && V.src.cardEl?.(it.id);
   const box = V.box;
@@ -210,10 +219,10 @@ function close() {
     const s0 = Math.min(r.width / ew(), r.height / eh());
     const x0 = r.left - sr.left + (r.width - ew() * s0) / 2, y0 = r.top - sr.top + (r.height - eh() * s0) / 2;
     anim = box.animate([{ transform: boxTransform(V.x, V.y, V.scale), opacity: 1 }, { transform: boxTransform(x0, y0, s0), opacity: .3 }],
-      { duration: 380, easing: "cubic-bezier(.16,1,.3,1)", fill: "forwards" });
+      { duration: 250, easing: "cubic-bezier(.16,1,.3,1)", fill: "forwards" });
   } else {
     anim = box.animate([{ opacity: 1, transform: boxTransform(V.x, V.y, V.scale) }, { opacity: 0, transform: boxTransform(V.x, V.y + 30, V.scale * .96) }],
-      { duration: 240, easing: "ease-in", fill: "forwards" });
+      { duration: 167, easing: "ease-in", fill: "forwards" });
   }
   anim.onfinish = done;
 }
@@ -231,6 +240,12 @@ function step(d) {
   V.id = items[n].id;
   V.src.onNavigate?.(V.id);
   show(null, d);
+}
+
+function applyBg() {
+  root.classList.toggle("bg-gray", V.bg === "gray");
+  root.classList.toggle("bg-light", V.bg === "light");
+  $('[data-act="bg"]').classList.toggle("on", V.bg !== "dark");
 }
 
 function syncButtons() {
@@ -285,6 +300,13 @@ async function act(a) {
       break;
     }
     case "board": if (it.external) return toast(tr("Сначала сохраните картинку в библиотеку")); addToBoardDialog([it.id]); break;
+    case "bg": {
+      V.bg = BGS[(BGS.indexOf(V.bg) + 1) % BGS.length];
+      store("viewerBg", V.bg);
+      applyBg();
+      toast({ dark: tr("Фон: тёмный"), gray: tr("Фон: нейтральный серый — для оценки цвета"), light: tr("Фон: светлый") }[V.bg], { life: 1400 });
+      break;
+    }
     case "trash": {
       if (it.external || !V.src.onTrash) return;
       const list = V.src.items, idx = list.indexOf(it);
@@ -508,7 +530,7 @@ export function viewerKey(e) {
     h: "mirror", "р": "mirror", g: "gray", "п": "gray", b: "blur", "и": "blur", s: "grid", "ы": "grid",
     r: "rotate", "к": "rotate", f: "fav", "а": "fav", "0": "fit", l: "loop", "д": "loop",
     ",": "back", "б": "back", ".": "fwd", "ю": "fwd", i: "pick", "ш": "pick", Delete: "trash",
-    x: "ab", "ч": "ab", k: "frame", "л": "frame",
+    x: "ab", "ч": "ab", k: "frame", "л": "frame", n: "bg", "т": "bg",
   };
   if (map[k]) { act(map[k]); return true; }
   return true; // просмотр модальный — остальные клавиши не уходят в сетку

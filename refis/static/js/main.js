@@ -1,6 +1,7 @@
 // Точка входа: навигация, командная палитра, горячие клавиши, вставка/перетаскивание, статус.
+import "./a11y.js";
 import { tr, translateStatic, rememberLang } from "./i18n.js";
-import { $, $$, api, esc, store, toast, on, emit, transition, isTyping, clipboardImages, modalOpen, closeModal, files } from "./util.js";
+import { $, $$, api, esc, store, toast, on, emit, transition, isTyping, clipboardImages, modalOpen, closeModal, files, trapFocus } from "./util.js";
 import {
   state as lib, initLibrary, load, loadTags, loadFolders, loadSaved, libraryKey, uploadDialog, folderDialog,
   applyQuery, toggleTag, toggleDetails, filterParams, layout,
@@ -213,7 +214,12 @@ addEventListener("keydown", (e) => {
   if (modalOpen()) { if (k === "Escape") closeModal(); return; }
   if (practiceOpen()) { e.preventDefault(); practiceKey(e); return; }
   if (triageOpen()) { if (triageKey(e) && !isTyping(e)) e.preventDefault(); return; }
-  if (viewerOpen()) { if (!isTyping(e)) { e.preventDefault(); viewerKey(e); } return; }
+  if (viewerOpen()) {
+    if (trapFocus($("#viewer"), e) || k === "Tab") return; // Tab ходит по кнопкам просмотра
+    if ((k === "Enter" || k === " ") && e.target.closest?.("#viewer button, #viewer select, #viewer input")) return;
+    if (!isTyping(e)) { e.preventDefault(); viewerKey(e); }
+    return;
+  }
   if (ctrl && ["1", "2", "3", "4", "5"].includes(k)) { e.preventDefault(); go({ 1: "today", 2: "library", 3: "boards", 4: "organize", 5: "pinterest" }[k]); return; }
   if ((ctrl && (k === "f" || k === "а")) || (k === "/" && !isTyping(e))) {
     e.preventDefault(); go("library"); setTimeout(() => $("#search").focus(), 30); return;

@@ -2,7 +2,7 @@
 import { tr, plural } from "./i18n.js";
 import {
   $, $$, api, esc, store, toast, menu, modal, confirmDialog, promptDialog, emit, on,
-  KINDS, KIND_PLURAL, fmtDur, fmtSize, files, thumbUrl, fileUrl, copyImage, copyText, isTyping,
+  KINDS, KIND_PLURAL, openContextMenuFor, fmtDur, fmtSize, files, thumbUrl, fileUrl, copyImage, copyText, isTyping,
 } from "./util.js";
 import { openViewer } from "./viewer.js";
 import { practiceDialog } from "./practice.js";
@@ -98,14 +98,29 @@ function cardInner(it) {
 // что видно на карточке — если изменилось, переиспользованную карточку надо перерисовать
 const cardSig = (it) => [it.kind, it.rating, it.favorite, it.name, it.thumb_state, it.duration, it.tags.join("|")].join("\u0001");
 
+// что диктор скажет о карточке
+function cardLabel(it) {
+  return [it.name, KIND_PLURAL[it.kind] || "", it.type === "video" ? `${tr("видео")} ${fmtDur(it.duration)}` : "",
+    it.rating ? `${tr("Оценка")} ${it.rating}` : "", it.favorite ? tr("в избранном") : "", it.tags.join(", ")].filter(Boolean).join(", ");
+}
+function ariaCard(el, it) {
+  el.setAttribute("aria-label", cardLabel(it));
+  el.setAttribute("aria-selected", state.selected.has(it.id) ? "true" : "false");
+  const i = state.items.indexOf(it);
+  if (i >= 0) { el.setAttribute("aria-posinset", i + 1); el.setAttribute("aria-setsize", state.total || state.items.length); }
+}
+
 function makeCard(it, i, animate) {
   const el = document.createElement("div");
   el.className = "card nomove" + (animate ? " enter" : "") + (state.selected.has(it.id) ? " sel" : "");
   el.dataset.id = it.id;
+  el.id = `card-${it.id}`;
+  el.setAttribute("role", "option");
   el.draggable = true; // на папку в боковой панели — переместить
   el.style.setProperty("--i", i);
   el.innerHTML = cardInner(it);
   el._sig = cardSig(it);
+  ariaCard(el, it);
   return el;
 }
 
@@ -209,6 +224,7 @@ function updateVisible() {
     grid.appendChild(frag);
     requestAnimationFrame(() => fresh.forEach((el) => el.classList.remove("nomove")));
   }
+  syncCursor();
 }
 
 let scrollRaf = 0;
@@ -255,12 +271,28 @@ export function updateCard(id) {
   const wasLoaded = img?.classList.contains("loaded");
   el.innerHTML = cardInner(it);
   el._sig = cardSig(it);
+  ariaCard(el, it);
   if (wasLoaded) { $("img", el)?.classList.add("loaded"); $(".ci", el).classList.add("ready"); }
 }
 
 export function refreshSelection() {
-  $$("#grid .card").forEach((c) => c.classList.toggle("sel", state.selected.has(+c.dataset.id)));
+  $$("#grid .card").forEach((c) => {
+    const on = state.selected.has(+c.dataset.id);
+    c.classList.toggle("sel", on);
+    c.setAttribute("aria-selected", on ? "true" : "false");
+  });
   updateCount();
+  syncCursor();
+}
+
+// «курсор» клавиатуры — карточка, от которой ходят стрелки; диктор узнаёт о ней через aria-activedescendant
+function syncCursor() {
+  const grid = $("#grid");
+  const it = state.items[state.anchor];
+  const el = it && state.selected.has(it.id) ? cardEls.get(it.id) : null;
+  $$("#grid .card.cursor").forEach((c) => c !== el && c.classList.remove("cursor"));
+  if (el) { el.classList.add("cursor"); grid.setAttribute("aria-activedescendant", el.id); }
+  else grid.removeAttribute("aria-activedescendant");
 }
 
 function select(ids, anchor) {
@@ -589,7 +621,7 @@ function renderBulk(ids) {
   $("#bForget").onclick = () => confirmDialog(
     tr("Убрать из каталога?"),
     `${files(ids.length)} ${tr("исчезнут из Refis вместе с тегами и заметками. Сами файлы на диске останутся, а при следующем сканировании появятся снова, но уже без тегов.")}`,
-    async () => { await bulk({ ids, forget: true }); state.selected.clear(); renderDetails(); }, tr("Убрать"));
+    async () => { await bulk({ ids, forget: true }); state.selected.clear(); renderDetails(); }, tr("Убрать"), { danger: true });
 }
 
 export async function bulk(body) {
@@ -621,7 +653,7 @@ export function trashMedia(ids) {
       }
       await Promise.all([reloadKeepSelection(), loadFolders()]);
       resolve(res.ids.length > 0);
-    }, tr("Удалить")));
+    }, tr("Удалить"), { danger: true }));
 }
 
 // ---------- редактор тегов
@@ -714,7 +746,7 @@ $("#taglist").addEventListener("contextmenu", (e) => {
       tr("Если ввести имя существующего тега — теги объединятся. Вложенность через «/», например «анатомия/руки»."),
       tag, async (name) => { await api(`/tags/${id}`, { method: "PATCH", body: { name } }); state.tags = []; state.ntags = []; await loadTags(); load(); })],
     [tr("Удалить тег"), () => confirmDialog(tr("Удалить тег?"), `${tr("Тег")} «${tag}» ${tr("будет снят со всех файлов. Сами файлы не пострадают.")}`,
-      async () => { await api(`/tags/${id}`, { method: "DELETE" }); state.tags = state.tags.filter((x) => x !== tag); await loadTags(); load(); }, tr("Удалить"))],
+      async () => { await api(`/tags/${id}`, { method: "DELETE" }); state.tags = state.tags.filter((x) => x !== tag); await loadTags(); load(); }, tr("Удалить"), { danger: true })],
   ]);
 });
 
@@ -887,7 +919,7 @@ function folderSettings(f) {
       };
       $("#sDel", box).onclick = () => confirmDialog(tr("Убрать папку из Refis?"),
         tr("Теги, оценки и заметки файлов этой папки будут удалены из каталога. Сами файлы на диске НЕ удаляются."),
-        async () => { await api(`/folders/${f.id}`, { method: "DELETE" }); state.folder = 0; state.sub = ""; await Promise.all([loadFolders(), loadTags()]); load(); }, tr("Убрать"));
+        async () => { await api(`/folders/${f.id}`, { method: "DELETE" }); state.folder = 0; state.sub = ""; await Promise.all([loadFolders(), loadTags()]); load(); }, tr("Убрать"), { danger: true });
     });
 }
 
@@ -939,6 +971,9 @@ export function uploadDialog(list) {
 
 export function libraryKey(e) {
   if (isTyping(e)) return false;
+  // Enter, пробел, стрелки и Delete принадлежат кнопке или пункту списка, на котором стоит фокус
+  const onControl = e.target.closest?.("button, a[href], [role=button], [role=menuitem], [role=tab], .bcard") && !e.target.closest("#grid");
+  if (onControl && ["Enter", " ", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "Delete"].includes(e.key)) return false;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   const ids = [...state.selected];
   const one = ids.length === 1 ? state.items.find((i) => i.id === ids[0]) : null;
@@ -946,8 +981,25 @@ export function libraryKey(e) {
     select(state.items.map((i) => i.id)); return true;
   }
   if ((e.ctrlKey || e.metaKey) && (k === "c" || k === "с") && one?.type === "image") { copyImage(fileUrl(one.id)); return true; }
+  if ((k === "ContextMenu" || (e.shiftKey && k === "F10")) && ids.length) {
+    const it = state.items[state.anchor];
+    const el = (it && cardEls.get(it.id)) || cardEls.get(ids[0]);
+    if (el) openContextMenuFor(el);
+    return true;
+  }
+  // Ctrl + / Ctrl − / Ctrl 0 — размер превью, как в Проводнике, Eagle и Lightroom (а не масштаб всего окна)
+  if ((e.ctrlKey || e.metaKey) && ["=", "+", "-", "_", "0"].includes(e.key)) {
+    const r = $("#thumbSize");
+    r.value = e.key === "0" ? 220 : +r.value + (e.key === "-" || e.key === "_" ? -40 : 40);
+    r.dispatchEvent(new Event("input"));
+    return true;
+  }
   if (e.ctrlKey || e.metaKey || e.altKey) return false;
   if (k === "Escape" && ids.length) { select([]); return true; }
+  if ((k === "Home" || k === "End") && state.items.length) {
+    const i = k === "Home" ? 0 : state.items.length - 1;
+    select([state.items[i].id], i); scrollToCard(state.items[i].id); if (k === "End") load(false); return true;
+  }
   if ((k === " " || k === "Enter") && ids.length) { view(ids[0]); return true; }
   if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(k)) { arrowNav(k, e.shiftKey); return true; }
   if (ids.length && /^[0-5]$/.test(k)) { bulk({ ids, rating: +k }); toast(+k ? `${tr("Оценка")} ${"★".repeat(+k)}` : tr("Оценка сброшена")); return true; }

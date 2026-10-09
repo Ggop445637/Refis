@@ -225,7 +225,7 @@ function sourceMenu(e, s) {
     [tr("Открыть в браузере"), () => openUrl(s.page)],
     "-",
     [tr("Отключить…"), () => confirmDialog(tr("Отключить доску?"), `«${s.title}» ${tr("исчезнет из Refis вместе с несохранёнными пинами. Уже сохранённые картинки останутся в библиотеке.")}`,
-      async () => { await api(`/pinterest/sources/${s.id}`, { method: "DELETE" }); PG.source = 0; renderPinterest(); }, tr("Отключить"))],
+      async () => { await api(`/pinterest/sources/${s.id}`, { method: "DELETE" }); PG.source = 0; renderPinterest(); }, tr("Отключить"), { danger: true })],
   ]);
 }
 

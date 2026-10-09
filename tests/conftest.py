@@ -106,3 +106,35 @@ def make_video(path: Path, seconds: int = 3) -> Path:
                     "-i", f"testsrc=duration={seconds}:size=320x240:rate=10", "-c:v", "libvpx", "-b:v", "200k", str(path)],
                    check=True)
     return path
+
+
+@pytest.fixture(scope="module")
+def page(client):
+    """Refis в настоящем Chromium (свой сервер на свободном порту, общая с тестами база)."""
+    import socket
+    import threading
+    import time
+
+    import uvicorn
+    pw = pytest.importorskip("playwright.sync_api")
+    from refis.server import app
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
+    threading.Thread(target=server.run, daemon=True).start()
+    while not server.started:
+        time.sleep(0.05)
+    exe = "/opt/pw-browsers/chromium" if os.path.exists("/opt/pw-browsers/chromium") else None
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(executable_path=exe)
+        pg = browser.new_page(viewport={"width": 1400, "height": 900})
+        pg.errors = []
+        pg.on("pageerror", lambda e: pg.errors.append(str(e)))
+        pg.on("console", lambda m: m.type == "error" and pg.errors.append(m.text))
+        pg.base = f"http://127.0.0.1:{port}"
+        pg.goto(pg.base + "/")
+        pg.wait_for_timeout(1200)
+        yield pg
+        browser.close()
+    server.should_exit = True

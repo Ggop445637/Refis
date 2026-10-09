@@ -145,8 +145,9 @@ async function deleteDialog(s) {
         <select id="dTo">${others.map((x) => `<option value="${x.key}">${esc(KIND_PLURAL[x.key])}</option>`).join("")}</select></label>
       <label class="check"><input type="radio" name="dWhat" value="trash"> ${tr("Удалить файлы в Корзину")}</label>`
     : `<p>${tr("Раздел пуст.")}</p>`}
-    <div class="actions"><button data-close>${tr("Отмена")}</button><button class="danger" id="dOk">${tr("Удалить раздел")}</button></div>`,
+    <div class="actions"><button data-close id="dCancel">${tr("Отмена")}</button><button class="danger strong" id="dOk">${tr("Удалить раздел")}</button></div>`,
     (box, close) => {
+      $("#dCancel", box).focus(); // опасное действие — по умолчанию «Отмена»
       $("#dOk", box).onclick = async () => {
         const trash = $('input[name="dWhat"]:checked', box)?.value === "trash";
         const to = $("#dTo", box)?.value || others[0].key;

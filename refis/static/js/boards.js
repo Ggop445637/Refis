@@ -46,7 +46,7 @@ export async function renderBoards() {
         }],
         [`📦 ${tr("Экспорт набора…")}`, () => exportPackDialog({ boardId: b.id, name: b.name })],
         "-",
-        [tr("Удалить…"), () => confirmDialog(tr("Удалить доску?"), `«${b.name}» ${tr("исчезнет. Картинки в библиотеке останутся.")}`, async () => { await api(`/boards/${b.id}`, { method: "DELETE" }); renderBoards(); }, tr("Удалить"))],
+        [tr("Удалить…"), () => confirmDialog(tr("Удалить доску?"), `«${b.name}» ${tr("исчезнет. Картинки в библиотеке останутся.")}`, async () => { await api(`/boards/${b.id}`, { method: "DELETE" }); renderBoards(); }, tr("Удалить"), { danger: true })],
       ]);
     };
   });

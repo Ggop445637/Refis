@@ -38,7 +38,7 @@ export async function renderOrganize() {
           <div class="frow" data-id="${f.id}">
             <span class="path" title="${esc(f.path)}">${esc(f.path)}</span>
             <span class="muted">${files(f.count)}${f.untagged ? ` · ${tr("без тегов")} ${f.untagged}` : ""}</span>
-            <select data-kind>${Object.entries(KINDS).map(([k, v]) => `<option value="${k}"${k === f.kind ? " selected" : ""}>${v}</option>`).join("")}</select>
+            <select data-kind aria-label="${tr("Раздел для её файлов")}">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}"${k === f.kind ? " selected" : ""}>${v}</option>`).join("")}</select>
             ${f.untagged ? `<button class="mini" data-tri="${f.id}">${tr("Разметить")}</button>` : ""}
           </div>`).join("")}</div>
         <div class="row"><button id="orgDiscover" class="primary">🔍 ${tr("Найти папки с картинками")}</button><button id="orgAdd">＋ ${tr("Указать папку вручную")}</button></div>
@@ -150,7 +150,7 @@ async function discover() {
       <input type="checkbox" data-i="${i}" ${f.arty || f.images > 30 ? "checked" : ""}>
       <span class="path" title="${esc(f.path)}">${esc(f.path)}</span>
       <span class="muted">${f.images} ${tr("фото")}${f.videos ? ` · ${f.videos} ${tr("видео")}` : ""}</span>
-      <select data-i="${i}">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}"${k === f.kind ? " selected" : ""}>${v}</option>`).join("")}</select>
+      <select data-i="${i}" aria-label="${tr("Раздел для её файлов")}">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}"${k === f.kind ? " selected" : ""}>${v}</option>`).join("")}</select>
     </label>`).join("")}</div>
     <div class="row"><button class="primary" id="foundAdd">${tr("Добавить отмеченные")}</button><span class="hint">${tr("Файлы останутся на месте")}</span></div>`;
   $("#foundAdd").onclick = async () => {

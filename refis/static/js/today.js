@@ -59,11 +59,11 @@ export async function renderToday() {
       <div class="glass tile flame rise" style="--d:6"><span class="ico">🔥</span><div class="num" data-n="${p.streak}">0</div><div class="lbl">${plural(p.streak, "день", "дня", "дней")} ${tr("практики подряд")}</div></div>
       <div class="glass tile rise" style="--d:7"><span class="ico">⏱️</span><div class="num" data-n="${p.week_minutes}">0</div><div class="lbl">${tr("минут рисования за неделю")}</div></div>
     </div>
-    <div class="glass heat rise" style="--d:8"><h3>${tr("Практика")} <small>${tr("последние 16 недель")} · ${p.total_sessions} ${plural(p.total_sessions, "сессия", "сессии", "сессий")}</small></h3><div class="heatgrid" id="heat"></div></div>
-    ${pins.items.length ? `<div class="glass strip rise" style="--d:9"><h3>${tr("Новое с")} Pinterest <small><a href="#" id="toPins">${tr("все пины")} →</a></small></h3><div class="row-scroll" id="pinsStrip"></div></div>` : ""}
-    ${stats.recent.length ? `<div class="glass strip rise" style="--d:10"><h3>${tr("Недавно добавленные")} <small>${files(stats.total)}</small></h3><div class="row-scroll" id="recent"></div></div>` : ""}
-    ${stats.forgotten.length ? `<div class="glass strip rise" style="--d:11"><h3>${tr("Давно не открывали")} <small>${tr("вспомнить старое")}</small></h3><div class="row-scroll" id="forgotten"></div></div>` : ""}
-    ${stats.top_tags.length ? `<div class="glass strip rise" style="--d:12"><h3>${tr("Ваши темы")}</h3><div class="tagcloud" id="cloud"></div></div>` : ""}
+    <div class="glass heat rise" style="--d:8"><h2>${tr("Практика")} <small>${tr("последние 16 недель")} · ${p.total_sessions} ${plural(p.total_sessions, "сессия", "сессии", "сессий")}</small></h2><div class="heatgrid" id="heat"></div></div>
+    ${pins.items.length ? `<div class="glass strip rise" style="--d:9"><h2>${tr("Новое с")} Pinterest <small><a href="#" id="toPins">${tr("все пины")} →</a></small></h2><div class="row-scroll" id="pinsStrip"></div></div>` : ""}
+    ${stats.recent.length ? `<div class="glass strip rise" style="--d:10"><h2>${tr("Недавно добавленные")} <small>${files(stats.total)}</small></h2><div class="row-scroll" id="recent"></div></div>` : ""}
+    ${stats.forgotten.length ? `<div class="glass strip rise" style="--d:11"><h2>${tr("Давно не открывали")} <small>${tr("вспомнить старое")}</small></h2><div class="row-scroll" id="forgotten"></div></div>` : ""}
+    ${stats.top_tags.length ? `<div class="glass strip rise" style="--d:12"><h2>${tr("Ваши темы")}</h2><div class="tagcloud" id="cloud"></div></div>` : ""}
   `;
   $$(".tile .num", root).forEach((el) => countUp(el, +el.dataset.n));
   $$("[data-go]", root).forEach((t) => (t.onclick = () => { emit("navigate", "library"); applyQuery({ view: t.dataset.go }); }));
@@ -148,7 +148,7 @@ async function renderHero(reroll = false) {
       <button id="hOpen">${tr("Открыть")}</button>
       <button class="primary" id="hDraw">⏱ ${tr("Рисовать 10 мин")}</button>
     </div>`;
-  if (reroll) content.animate([{ opacity: 0, transform: "translateY(12px)" }, { opacity: 1, transform: "none" }], { duration: 500, easing: "cubic-bezier(.16,1,.3,1)" });
+  if (reroll) content.animate([{ opacity: 0, transform: "translateY(12px)" }, { opacity: 1, transform: "none" }], { duration: 333, easing: "cubic-bezier(.16,1,.3,1)" });
   $("#hOther").onclick = () => { todayN++; renderHero(true); };
   if (t.tag) $("#hTopic").onclick = () => { lib.tags = []; lib.ntags = []; toggleTag(t.tag); };
   $("#hOpen").onclick = () => openViewer({ items: [m] }, m.id, hero);
@@ -184,7 +184,7 @@ async function renderChallenge(reroll = false) {
       <button id="cShuffle">🎲 ${tr("Другое")}</button>
       <button class="primary" id="cGo">${tr("Начать")}</button>
     </div>`;
-  if (reroll) box.animate([{ opacity: .4, transform: "scale(.98)" }, { opacity: 1, transform: "none" }], { duration: 420, easing: "cubic-bezier(.16,1,.3,1)" });
+  if (reroll) box.animate([{ opacity: .4, transform: "scale(.98)" }, { opacity: 1, transform: "none" }], { duration: 333, easing: "cubic-bezier(.16,1,.3,1)" });
   $("#cShuffle").onclick = () => { challengeN++; renderChallenge(true); };
   $("#cGo").onclick = () => startChallenge(ch);
 }
