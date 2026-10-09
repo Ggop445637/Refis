@@ -147,3 +147,26 @@ def test_streaks():
     assert _streaks(days) == (3, 5)
     assert _streaks({today - dt.timedelta(days=1)}) == (1, 1)  # вчера — серия ещё жива
     assert _streaks(set()) == (0, 0)
+
+
+def test_exif_rotated_photo_thumbnail(client):
+    """Фото с телефона: пиксели лежат боком, EXIF Orientation=6 — размеры и превью должны быть вертикальными."""
+    import io
+    import time
+
+    from PIL import Image
+    im = Image.new("RGB", (1200, 800), (60, 70, 90))
+    ex = Image.Exif()
+    ex[0x0112] = 6
+    b = io.BytesIO()
+    im.save(b, "JPEG", exif=ex.tobytes())
+    fid = client.get("/api/folders").json()[0]["id"]
+    mid = client.post("/api/upload", data={"folder_id": fid}, files={"files": ("phone.jpg", b.getvalue(), "image/jpeg")}).json()["added"][0]
+    for _ in range(100):
+        m = client.get(f"/api/media/{mid}").json()
+        if m["thumb_state"]:
+            break
+        time.sleep(0.05)
+    assert (m["width"], m["height"]) == (800, 1200)
+    thumb = Image.open(io.BytesIO(client.get(f"/api/thumb/{mid}").content))
+    assert thumb.height > thumb.width

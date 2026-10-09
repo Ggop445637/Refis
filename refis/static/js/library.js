@@ -58,7 +58,7 @@ export async function load(reset = true) {
       state.items.push(...data.items.filter((i) => !prevIds.has(i.id)));
     }
     state.total = data.total;
-    renderGrid(reset, prevIds);
+    renderGrid(reset);
     renderChips();
     renderDetails();
     persist();
@@ -100,26 +100,21 @@ function makeCard(it, i, animate) {
   return el;
 }
 
-function renderGrid(reset, prevIds = new Set()) {
-  const grid = $("#grid");
+// ---------- виртуальная сетка: в DOM только карточки рядом с видимой областью
+
+const cardEls = new Map();  // id → элемент карточки (только отрисованные)
+let shown = new Set();      // id, которые уже появлялись — анимация входа один раз
+const BUFFER = 1200;        // запас над и под экраном, px
+
+function renderGrid(reset) {
   if (reset) {
-    // карточки, которые остались, переиспользуем — они плавно переедут на новые места
-    const keep = new Map($$(".card", grid).map((c) => [+c.dataset.id, c]));
-    const frag = document.createDocumentFragment();
-    let fresh = 0;
-    state.items.forEach((it) => {
-      let el = keep.get(it.id);
-      if (el) { keep.delete(it.id); el.classList.remove("enter"); el.classList.toggle("sel", state.selected.has(it.id)); }
-      else el = makeCard(it, fresh++, true);
-      frag.appendChild(el);
+    // карточки, которые остались в выдаче, переиспользуем — они плавно переедут на новые места
+    const ids = new Set(state.items.map((i) => i.id));
+    cardEls.forEach((el, id) => {
+      if (!ids.has(id)) { el.remove(); cardEls.delete(id); }
+      else { el.classList.remove("enter"); el.classList.toggle("sel", state.selected.has(id)); }
     });
-    keep.forEach((el) => el.remove());
-    grid.appendChild(frag);
-  } else {
-    const frag = document.createDocumentFragment();
-    let fresh = 0;
-    state.items.forEach((it) => { if (!prevIds.has(it.id)) frag.appendChild(makeCard(it, fresh++, true)); });
-    grid.appendChild(frag);
+    shown = new Set(cardEls.keys());
   }
   layout();
   updateCount();
@@ -157,17 +152,58 @@ export function layout() {
     });
     if (row.length) flush(H);
   }
-  const cards = $$(".card", grid);
-  cards.forEach((el, i) => {
-    const p = pos[i];
-    if (!p) return;
-    el.style.transform = `translate(${p.x}px, ${p.y}px)`;
-    el.style.width = p.w + "px";
-    el.style.height = p.h + "px";
-  });
   grid.style.height = Math.max(0, y - GAP) + "px";
-  requestAnimationFrame(() => cards.forEach((el) => el.classList.remove("nomove")));
+  const index = new Map(state.items.map((it, i) => [it.id, i]));
+  cardEls.forEach((el, id) => place(el, pos[index.get(id)]));
+  updateVisible();
 }
+
+function place(el, p) {
+  if (!p) return;
+  el.style.transform = `translate(${p.x}px, ${p.y}px)`;
+  el.style.width = p.w + "px";
+  el.style.height = p.h + "px";
+}
+
+/** Первый индекс, чья карточка заканчивается ниже top (позиции отсортированы по y). */
+function firstVisible(top) {
+  let lo = 0, hi = pos.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (pos[mid].y + pos[mid].h < top) lo = mid + 1; else hi = mid;
+  }
+  return lo;
+}
+
+function updateVisible() {
+  const wrap = $("#gridwrap"), grid = $("#grid");
+  const top = wrap.scrollTop - BUFFER, bottom = wrap.scrollTop + wrap.clientHeight + BUFFER;
+  const want = new Map(); // id → индекс
+  for (let i = firstVisible(top); i < pos.length && pos[i].y <= bottom; i++) want.set(state.items[i].id, i);
+  cardEls.forEach((el, id) => { if (!want.has(id)) { el.remove(); cardEls.delete(id); } });
+  const frag = document.createDocumentFragment();
+  const fresh = [];
+  let n = 0;
+  want.forEach((i, id) => {
+    if (cardEls.has(id)) return;
+    const el = makeCard(state.items[i], n++, !shown.has(id));
+    place(el, pos[i]);
+    cardEls.set(id, el);
+    shown.add(id);
+    fresh.push(el);
+    frag.appendChild(el);
+  });
+  if (fresh.length) {
+    grid.appendChild(frag);
+    requestAnimationFrame(() => fresh.forEach((el) => el.classList.remove("nomove")));
+  }
+}
+
+let scrollRaf = 0;
+$("#gridwrap").addEventListener("scroll", () => {
+  if (scrollRaf) return;
+  scrollRaf = requestAnimationFrame(() => { scrollRaf = 0; updateVisible(); });
+}, { passive: true });
 
 new ResizeObserver(() => layout()).observe($("#gridwrap"));
 

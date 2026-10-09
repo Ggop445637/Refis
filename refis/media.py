@@ -178,9 +178,13 @@ def make_thumb(row) -> None:
     conn = db.connect()
     if row["type"] == "image":
         with Image.open(row["path"]) as im:
-            im = ImageOps.exif_transpose(im)
             w, h = im.size
-            im.thumbnail((THUMB_SIZE, THUMB_SIZE))
+            if im.getexif().get(0x0112, 1) in (5, 6, 7, 8):  # фото с телефона, повёрнутое через EXIF
+                w, h = h, w
+            # JPEG умеет декодироваться сразу в уменьшенном виде — в разы быстрее и экономнее по памяти
+            im.draft("RGB", (THUMB_SIZE * 2, THUMB_SIZE * 2))
+            im = ImageOps.exif_transpose(im)
+            im.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.Resampling.LANCZOS)
             if im.mode not in ("RGB", "L"):
                 bg = Image.new("RGB", im.size, (40, 40, 40))
                 im = im.convert("RGBA")
@@ -207,7 +211,9 @@ def make_thumb(row) -> None:
 
 
 class ThumbWorker:
-    """Фоновый поток: делает превью для всех файлов, у которых их ещё нет."""
+    """Фоновые потоки: делают превью для всех файлов, у которых их ещё нет."""
+
+    WORKERS = max(1, min(4, (os.cpu_count() or 2) - 1))
 
     def __init__(self):
         self._wake = queue.Queue()
@@ -217,25 +223,30 @@ class ThumbWorker:
     def kick(self):
         self._wake.put(1)
 
+    def _one(self, row):
+        try:
+            make_thumb(row)
+        except Exception as e:  # битый файл не должен ронять поток
+            log.warning("превью не создано %s: %s", row["path"], e)
+            db.connect().execute("UPDATE media SET thumb_state = -1 WHERE id = ?", (row["id"],))
+        self.pending = max(0, self.pending - 1)
+
     def _run(self):
+        from concurrent.futures import ThreadPoolExecutor
+        pool = ThreadPoolExecutor(self.WORKERS, thread_name_prefix="thumb")
         while True:
             self._wake.get()
             conn = db.connect()
             while True:
+                # сначала картинки (свежие — первыми), видео потом: ffmpeg медленнее
                 rows = conn.execute(
                     "SELECT id, path, type FROM media WHERE thumb_state = 0 AND missing = 0 "
-                    "ORDER BY type = 'video', id DESC LIMIT 50").fetchall()
+                    "ORDER BY type = 'video', id DESC LIMIT 64").fetchall()
                 self.pending = conn.execute(
                     "SELECT COUNT(*) FROM media WHERE thumb_state = 0 AND missing = 0").fetchone()[0]
                 if not rows:
                     break
-                for row in rows:
-                    try:
-                        make_thumb(row)
-                    except Exception as e:  # битый файл не должен ронять поток
-                        log.warning("превью не создано %s: %s", row["path"], e)
-                        conn.execute("UPDATE media SET thumb_state = -1 WHERE id = ?", (row["id"],))
-                    self.pending = max(0, self.pending - 1)
+                list(pool.map(self._one, rows))
             self.pending = 0
 
 
