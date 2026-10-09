@@ -175,7 +175,11 @@ export function countUp(el, to, dur = 900) {
 
 /** Переход между состояниями через View Transitions API (если есть). */
 export function transition(fn) {
-  if (document.startViewTransition && !reduced()) return document.startViewTransition(fn);
+  if (document.startViewTransition && !reduced()) {
+    const t = document.startViewTransition(fn);
+    t.ready.catch(() => {}); // новый переход прервал этот — это нормально, не ошибка
+    return t;
+  }
   fn();
 }
 

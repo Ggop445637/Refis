@@ -35,8 +35,8 @@ export function go(p) {
   if (p === page) return;
   const prev = page;
   if (prev === "board") leaveBoard();
+  page = p; // сразу, а не в анимации: повторный go(p) до её начала не должен запускать вторую
   const swap = () => {
-    page = p;
     document.body.dataset.page = p;
     $$(".page").forEach((el) => el.classList.toggle("active", el.dataset.page === p));
     const navPage = p === "board" ? "boards" : p;

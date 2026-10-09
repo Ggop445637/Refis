@@ -203,3 +203,21 @@ def test_pack_export_and_import_dialogs(page, client, monkeypatch):
     assert page.is_visible('.page[data-page="library"]')
     assert not page.errors, page.errors
     page.fill("#search", "")
+
+
+def test_repeated_navigation_starts_one_transition(page):
+    page.click("#mainNav [data-page=boards]")
+    page.wait_for_timeout(600)
+    n = page.evaluate("""async () => {
+      let n = 0;
+      const orig = document.startViewTransition?.bind(document);
+      if (orig) document.startViewTransition = (fn) => { n++; return orig(fn); };
+      const u = await import('/js/util.js');
+      u.emit('navigate', 'library'); u.emit('navigate', 'library');
+      if (orig) document.startViewTransition = orig;
+      return orig ? n : 1;
+    }""")
+    page.wait_for_timeout(600)
+    assert n == 1
+    assert page.is_visible('.page[data-page="library"]')
+    assert not page.errors, page.errors
