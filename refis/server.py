@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from .i18n import tr
 from . import __version__, db, media, organize, pinterest, profile, security, system
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -70,7 +71,7 @@ def media_tags(conn, ids: list[int]) -> dict[int, list[str]]:
 def get_media(conn, mid: int) -> dict:
     r = conn.execute("SELECT * FROM media WHERE id = ?", (mid,)).fetchone()
     if not r:
-        raise HTTPException(404, "Файл не найден в каталоге")
+        raise HTTPException(404, tr("Файл не найден в каталоге"))
     d = row_dict(r)
     d["tags"] = media_tags(conn, [mid])[mid]
     if d["qhash"]:
@@ -148,14 +149,14 @@ def folders():
 def add_folder(f: FolderIn):
     path = os.path.abspath(os.path.expanduser(f.path.strip().strip('"')))
     if not os.path.isdir(path):
-        raise HTTPException(400, f"Папка не найдена: {path}")
+        raise HTTPException(400, tr("Папка не найдена: {path}", path=path))
     if f.kind not in db.KINDS:
-        raise HTTPException(400, "Неизвестный тип")
+        raise HTTPException(400, tr("Неизвестный тип"))
     conn = db.connect()
     for r in conn.execute("SELECT path FROM folders"):
         a, b = os.path.normcase(r["path"]), os.path.normcase(path)
         if a == b or b.startswith(a + os.sep) or a.startswith(b + os.sep):
-            raise HTTPException(400, f"Пересекается с уже добавленной папкой: {r['path']}")
+            raise HTTPException(400, tr("Пересекается с уже добавленной папкой: {path}", path=r["path"]))
     fid = conn.execute("INSERT INTO folders(path, kind, auto_tags) VALUES (?,?,?)",
                        (path, f.kind, int(f.auto_tags))).lastrowid
     threading.Thread(target=media.scan_folder, args=(fid,), daemon=True).start()
@@ -167,7 +168,7 @@ def patch_folder(fid: int, p: FolderPatch):
     conn = db.connect()
     if p.kind is not None:
         if p.kind not in db.KINDS:
-            raise HTTPException(400, "Неизвестный тип")
+            raise HTTPException(400, tr("Неизвестный тип"))
         conn.execute("UPDATE folders SET kind = ? WHERE id = ?", (p.kind, fid))
         if p.apply_kind:
             conn.execute("UPDATE media SET kind = ? WHERE folder_id = ?", (p.kind, fid))
@@ -278,7 +279,7 @@ def patch_media(mid: int, p: MediaPatch):
     fields = p.model_dump(exclude_none=True)
     tags = fields.pop("tags", None)
     if "kind" in fields and fields["kind"] not in db.KINDS:
-        raise HTTPException(400, "Неизвестный тип")
+        raise HTTPException(400, tr("Неизвестный тип"))
     if "rating" in fields:
         fields["rating"] = max(0, min(5, fields["rating"]))
     if fields:
@@ -356,7 +357,7 @@ def thumb(mid: int):
 def file(mid: int):
     r = db.connect().execute("SELECT path FROM media WHERE id = ?", (mid,)).fetchone()
     if not r or not os.path.exists(r["path"]):
-        raise HTTPException(404, "Файл не найден на диске")
+        raise HTTPException(404, tr("Файл не найден на диске"))
     return FileResponse(r["path"])
 
 
@@ -398,13 +399,13 @@ _safe_name = media.safe_name
 
 
 @app.post("/api/upload")
-def upload(files: list[UploadFile] = File(...), folder_id: int = Form(...), subdir: str = Form("_Входящие"),
+def upload(files: list[UploadFile] = File(...), folder_id: int = Form(...), subdir: str = Form(""),
            tags: str = Form(""), kind: str = Form("")):
     conn = db.connect()
     folder = conn.execute("SELECT * FROM folders WHERE id = ?", (folder_id,)).fetchone()
     if not folder:
-        raise HTTPException(400, "Папка не найдена")
-    dest = media.target_dir(folder["path"], subdir)
+        raise HTTPException(400, tr("Папка не найдена"))
+    dest = media.target_dir(folder["path"], subdir or tr("_Входящие"))
     tag_list = [t for t in (db.normalize_tag(x) for x in tags.split(",")) if t]
     added = []
     for f in files:
@@ -440,7 +441,7 @@ def rename_tag(tid: int, p: TagPatch):
     conn = db.connect()
     name = db.normalize_tag(p.name)
     if not name:
-        raise HTTPException(400, "Пустое имя")
+        raise HTTPException(400, tr("Пустое имя"))
     other = conn.execute("SELECT id FROM tags WHERE name = ? AND id != ?", (name, tid)).fetchone()
     if other:
         conn.execute("INSERT OR IGNORE INTO media_tags SELECT media_id, ? FROM media_tags WHERE tag_id = ?",
@@ -471,7 +472,7 @@ def saved():
 @app.post("/api/saved")
 def add_saved(s: SavedIn):
     sid = db.connect().execute("INSERT INTO saved_searches(name, query) VALUES (?, ?)",
-                               (s.name.strip() or "Поиск", json.dumps(s.query, ensure_ascii=False))).lastrowid
+                               (s.name.strip() or tr("Поиск"), json.dumps(s.query, ensure_ascii=False))).lastrowid
     return {"id": sid}
 
 
@@ -615,7 +616,7 @@ def create_board(b: BoardIn):
     now = time.time()
     data = json.dumps(b.data or {"items": []}, ensure_ascii=False)
     bid = db.connect().execute("INSERT INTO boards(name, data, created_at, updated_at) VALUES (?,?,?,?)",
-                               ((b.name or "Новая доска").strip(), data, now, now)).lastrowid
+                               ((b.name or tr("Новая доска")).strip(), data, now, now)).lastrowid
     return {"id": bid}
 
 
@@ -623,7 +624,7 @@ def create_board(b: BoardIn):
 def get_board(bid: int):
     r = db.connect().execute("SELECT * FROM boards WHERE id = ?", (bid,)).fetchone()
     if not r:
-        raise HTTPException(404, "Доска не найдена")
+        raise HTTPException(404, tr("Доска не найдена"))
     return {"id": r["id"], "name": r["name"], "data": json.loads(r["data"]), "updated_at": r["updated_at"]}
 
 
@@ -631,7 +632,7 @@ def get_board(bid: int):
 def save_board(bid: int, b: BoardIn):
     conn = db.connect()
     if b.name is not None:
-        conn.execute("UPDATE boards SET name = ?, updated_at = ? WHERE id = ?", (b.name.strip() or "Доска", time.time(), bid))
+        conn.execute("UPDATE boards SET name = ?, updated_at = ? WHERE id = ?", (b.name.strip() or tr("Доска"), time.time(), bid))
     if b.data is not None:
         conn.execute("UPDATE boards SET data = ?, updated_at = ? WHERE id = ?",
                      (json.dumps(b.data, ensure_ascii=False), time.time(), bid))
@@ -656,7 +657,7 @@ def _pictures_dir() -> Path:
 def export_board(bid: int, file: UploadFile = File(...)):
     out_dir = _pictures_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
-    base = _safe_name(os.path.splitext(file.filename or "доска")[0]) or "доска"
+    base = _safe_name(os.path.splitext(file.filename or tr("доска"))[0]) or tr("доска")
     target, n = out_dir / f"{base}.png", 1
     while target.exists():
         target = out_dir / f"{base} ({n}).png"; n += 1

@@ -1,0 +1,296 @@
+// English. Keys are the Russian source strings; "{0}" — values substituted by t``.
+// Plural forms: "one|few|many" → [singular, plural].
+export default {
+  // ---------------------------------------------------------------- plurals
+  "файл|файла|файлов": ["file", "files"],
+  "день|дня|дней": ["day", "days"],
+  "задание|задания|заданий": ["challenge", "challenges"],
+  "папка|папки|папок": ["folder", "folders"],
+  "пин|пина|пинов": ["pin", "pins"],
+  "сессия|сессии|сессий": ["session", "sessions"],
+  "элемент|элемента|элементов": ["item", "items"],
+  "час|часа|часов": ["hour", "hours"],
+  "раз|раза|раз": ["time", "times"],
+
+  // ---------------------------------------------------------------- units & small words
+  " ГБ": " GB", " КБ": " KB", " МБ": " MB", " мин": " min", "мин": "min", "с": "s", "ч": "h", "шт": "pcs",
+  "1 мин": "1 min", "2 мин": "2 min", "5 мин": "5 min", "10 мин": "10 min", "20 мин": "20 min", "30 с": "30 s",
+  "из": "of", "Да": "Yes", "фото": "photos", "видео": "videos",
+  "янв": "Jan", "фев": "Feb", "мар": "Mar", "апр": "Apr", "май": "May", "июн": "Jun",
+  "июл": "Jul", "авг": "Aug", "сен": "Sep", "окт": "Oct", "ноя": "Nov", "дек": "Dec",
+  " (копия)": " (copy)", "вставка": "pasted",
+
+  // ---------------------------------------------------------------- navigation & common
+  "Сегодня": "Today", "Порядок": "Organize", "Библиотека": "Library", "Доски": "Boards", "Профиль": "Profile",
+  "Настройки": "Settings", "Команды": "Commands", "Командная панель": "Command palette",
+  "Поверх всех окон": "Always on top", "Настройки и «О программе»": "Settings and About",
+  "Все файлы": "All files", "Референсы": "References", "Мои работы": "My works", "Туториалы": "Tutorials", "Прочее": "Other",
+  "★ Избранное": "★ Favorites", "Избранное": "Favorites", "Без тегов": "Untagged", "Дубликаты": "Duplicates", "Пропавшие": "Missing",
+  "Сохранённые": "Saved", "Теги": "Tags", "Папки": "Folders", "найти…": "find…", "Добавить папку": "Add folder",
+  "Референс": "Reference", "Моя работа": "My work", "Туториал": "Tutorial",
+  "Отмена": "Cancel", "Готово": "Done", "Закрыть": "Close", "Сохранить": "Save", "Удалить": "Delete", "Открыть": "Open",
+  "Показать": "Show", "Подробнее": "Details", "Понятно": "Got it", "Позже": "Later", "Начать": "Start", "Дальше": "Next",
+  "Назад": "Back", "Пропустить": "Skip", "Применить": "Apply", "Добавить": "Add", "Убрать": "Remove", "Отменить": "Undo",
+  "Ошибка запроса": "Request failed", "Ничего не найдено": "Nothing found", "Пусто": "Empty", "пока нет": "none yet",
+  "необязательно": "optional", "необязательно, через запятую": "optional, comma-separated",
+
+  // ---------------------------------------------------------------- library toolbar & grid
+  "Поиск: слова, #тег, -#исключить": "Search: words, #tag, -#exclude",
+  "Всё": "All", "Фото": "Photos", "Видео": "Videos",
+  "Ориентация": "Orientation", "Любая форма": "Any shape", "Вертикальные": "Portrait", "Горизонтальные": "Landscape", "Квадратные": "Square",
+  "Оценка": "Rating", "Любая оценка": "Any rating",
+  "Сортировка": "Sort", "Сначала новые": "Newest first", "Сначала старые": "Oldest first", "По дате файла": "By file date",
+  "По имени": "By name", "По оценке": "By rating", "По размеру": "By size", "По длительности": "By duration", "Перемешать": "Shuffle",
+  "Вид сетки": "Grid style", "Плитка — без обрезки": "Tiles — no cropping", "Квадраты": "Squares",
+  "Размер превью": "Thumbnail size", "Сохранить текущий поиск": "Save current search",
+  "Тренировка": "Practice", "Тренировка набросков по подборке": "Gesture practice with this selection",
+  "Панель деталей (I)": "Details panel (I)",
+  "выбрано": "selected", "нет превью": "no preview",
+  "Библиотека пока пуста": "Your library is empty",
+  "Добавьте папку со своими референсами, артами или уроками. Файлы останутся на месте — Refis только построит каталог.":
+    "Add a folder with your references, artworks or tutorials. Files stay where they are — Refis only builds a catalog.",
+  "Ничего не нашлось": "Nothing found", "Попробуйте убрать часть фильтров.": "Try removing some filters.", "Сбросить фильтры": "Reset filters",
+  "Пробел": "Space", "Копировать картинку": "Copy image", "Показать в проводнике": "Show in Explorer",
+  "Открыть в программе": "Open in default app", "На доску…": "Add to board…", "Тренировка по выбранным": "Practice with selected",
+  "В избранное": "Add to favorites", "Убрать из избранного": "Remove from favorites", "Тип": "Type",
+  "Выберите файл, чтобы увидеть детали": "Select a file to see details",
+  "Клик": "Click", "выбрать": "select", "несколько": "multiple", "просмотр": "view", "оценка": "rating", "избранное": "favorite",
+  "добавить тег": "add tag", "копировать": "copy", "Перетащите или вставьте": "Drop or paste", "картинку, чтобы добавить": "an image to add it",
+  "Открыть просмотр": "Open viewer", "Палитра — клик копирует цвет": "Palette — click to copy a color",
+  "♥ В избранном": "♥ Favorite", "♡ В избранное": "♡ Favorite",
+  "Источник, автор, ссылка": "Source, author, link", "pinterest, artstation, имя автора…": "pinterest, artstation, author name…",
+  "Заметки": "Notes", "Что здесь полезного, что изучить…": "What's useful here, what to study…",
+  "Рисовать": "Draw", "Копировать": "Copy", "Доска": "Board",
+  "Размер": "Size", "Длина": "Length", "Файл": "File", "Изменён": "Modified", "Открыт": "Opened", "Путь": "Path",
+  "Файл не найден на диске.": "File not found on disk.", "Убрать из каталога": "Remove from catalog",
+  "Выбрано": "Selected", "Добавить теги всем": "Add tags to all", "тег и": "tag and",
+  "Теги выбранных — × снимает со всех": "Tags of selection — × removes from all", "<span class=\"hint\">тегов нет</span>": "<span class=\"hint\">no tags</span>",
+  "не менять": "keep", "сброс": "reset", "На доску": "To board", "Файлы на диске останутся": "Files on disk stay untouched",
+  "Тег": "Tag", "добавлен к": "added to", "снят с": "removed from",
+  "Убрать из каталога?": "Remove from catalog?",
+  "исчезнут из Refis вместе с тегами и заметками. Сами файлы на диске останутся, а при следующем сканировании появятся снова, но уже без тегов.":
+    "will disappear from Refis with their tags and notes. The files stay on disk and will reappear on the next scan, without tags.",
+  "добавить тег…": "add tag…",
+  "клик: показать, Alt+клик: исключить": "click: show, Alt+click: exclude", "нет совпадений": "no matches", "Тегов пока нет": "No tags yet",
+  "Показать только его": "Show only this", "Исключить из поиска": "Exclude from search", "Alt+клик": "Alt+click",
+  "Переименовать или объединить…": "Rename or merge…", "Переименовать тег": "Rename tag",
+  "Если ввести имя существующего тега — теги объединятся. Вложенность через «/», например «анатомия/руки».":
+    "Entering an existing tag name merges the tags. Use “/” for nesting, e.g. “anatomy/hands”.",
+  "Удалить тег": "Delete tag", "Удалить тег?": "Delete tag?", "будет снят со всех файлов. Сами файлы не пострадают.": "will be removed from all files. The files themselves are safe.",
+  "Нажмите ＋, чтобы добавить": "Press ＋ to add one", "Настройки папки…": "Folder settings…", "Пересканировать": "Rescan",
+  "Кнопка ☆ над сеткой сохранит поиск": "The ☆ button above the grid saves a search", "Удалить поиск": "Delete search",
+  "Сохранить поиск": "Save search", "Он появится в боковой панели — один клик, и подборка снова перед вами.":
+    "It will appear in the sidebar — one click brings the selection back.", "Поиск сохранён": "Search saved", "Сбросить всё": "Reset all",
+  "Папка": "Folder", "<button id=\"fPick\">Обзор…</button>": "<button id=\"fPick\">Browse…</button>", "D:\\Арт\\Референсы": "D:\\Art\\References",
+  "Refis не копирует и не перемещает файлы, а только запоминает, где они лежат, и строит каталог с превью.":
+    "Refis doesn't copy or move files — it just remembers where they are and builds a catalog with previews.",
+  "Что в ней по умолчанию": "What's inside by default", "Сделать теги из названий подпапок": "Create tags from subfolder names",
+  "«Руки\\Мужские» → теги «руки» и «мужские»": "“Hands\\Male” → tags “hands” and “male”",
+  "Папка добавлена — сканирую…": "Folder added — scanning…", "Тип по умолчанию": "Default type",
+  "Применить этот тип ко всем": "Apply this type to all", "папки": "in the folder", "Теги из названий подпапок для новых файлов": "Tags from subfolder names for new files",
+  "Убрать из": "Remove from", "Убрать папку из Refis?": "Remove folder from Refis?",
+  "Теги, оценки и заметки файлов этой папки будут удалены из каталога. Сами файлы на диске НЕ удаляются.":
+    "Tags, ratings and notes for files in this folder will be removed from the catalog. Files on disk are NOT deleted.",
+  "Сначала добавьте папку библиотеки": "Add a library folder first", "Папка библиотеки": "Library folder", "Подпапка": "Subfolder",
+  "_Входящие": "_Inbox", "как у папки": "same as folder", "Теги через запятую": "Tags, comma-separated", "анатомия, руки": "anatomy, hands",
+  "Источник": "Source", "Копирую…": "Copying…", "Добавлено": "Added", "Оценка сброшена": "Rating cleared",
+  "Убрано из избранного": "Removed from favorites",
+
+  // ---------------------------------------------------------------- viewer
+  "Отзеркалить (H)": "Mirror (H)", "Ч/Б": "B/W", "Чёрно-белое (G)": "Black & white (G)", "Размытие — тоновые пятна (B)": "Blur — value masses (B)",
+  "Пятна": "Masses", "Сетка пропорций (S)": "Proportion grid (S)", "Повернуть (R)": "Rotate (R)", "Пипетка": "Eyedropper",
+  "Пипетка — взять цвет (I)": "Eyedropper — pick a color (I)", "Копир.": "Copy", "Копировать картинку (Ctrl+C)": "Copy image (Ctrl+C)",
+  "Кадр назад (,)": "Previous frame (,)", "Кадр вперёд (.)": "Next frame (.)", "Скорость ([ ])": "Speed ([ ])", "Повтор (L)": "Loop (L)",
+  "В избранное (F)": "Favorite (F)", "＋ Доска": "＋ Board", "Закрыть (Esc)": "Close (Esc)", "Назад (←)": "Previous (←)", "Вперёд (→)": "Next (→)",
+  "Пауза (Пробел)": "Pause (Space)", "Звук (M)": "Sound (M)",
+  "Этот формат не играет встроенный плеер": "The built-in player can't play this format", "Откройте видео в системном плеере.": "Open the video in your system player.",
+  "Открыть в плеере": "Open in player", "Копировать можно только картинки": "Only images can be copied",
+  "Сначала сохраните картинку в библиотеку": "Save the image to your library first", "Скорость": "Speed",
+
+  // ---------------------------------------------------------------- practice
+  "Дальше (→)": "Next (→)", "Зеркало (H)": "Mirror (H)", "Ч/Б (G)": "B/W (G)", "Закончить (Esc)": "Finish (Esc)", "Закончить": "Finish",
+  "Рисовать по референсу": "Draw from reference", "Тренировка набросков": "Gesture practice",
+  "один выбранный референс": "one selected reference", "выбранные файлы": "selected files", "текущая подборка": "current selection",
+  "видео пропускаются)": "videos are skipped)", "Время на картинку": "Time per image", "Без таймера": "No timer",
+  "или своё время в секундах": "or custom time in seconds", "Сколько картинок": "How many images", "Отзеркалить": "Mirror",
+  "Чёрно-белое": "Black & white", "В подборке нет картинок": "No images in this selection",
+  "Отличная работа!": "Great work!", "Сессия завершена": "Session finished", "Задание выполнено": "Challenge done",
+  "Набросков": "Sketches", "за листом": "of drawing", "серия": "streak",
+
+  // ---------------------------------------------------------------- today
+  "Доброй ночи": "Good night", "Доброе утро": "Good morning", "Добрый день": "Good afternoon", "Добрый вечер": "Good evening",
+  "художник": "artist", "подряд": "in a row", "Начнём с порядка": "Let's start by getting organized",
+  "Refis найдёт на компьютере папки с картинками и видео, поможет разложить их по типам и тегам.":
+    "Refis will find folders with images and videos on your computer and help you sort them by type and tag.",
+  "Потом на основе вашей библиотеки будут появляться референс дня, задания и подборки.":
+    "Then the reference of the day, challenges and collections will be built from your library.",
+  "Найти мои папки": "Find my folders", "Сначала наведём порядок": "Let's get organized first", "Размечено": "Tagged",
+  "Когда у файлов появятся теги": "Once your files have tags",
+  "референс дня и задания будут подбираться по вашим темам — и по тем, которые вы давно не практиковали.":
+    "the reference of the day and challenges will be picked from your topics — especially the ones you haven't practiced lately.",
+  "Открыть «Порядок»": "Open Organize", "Быстрая разметка": "Quick tagging", "файлов в библиотеке": "files in library",
+  "порядка": "organized", "без тегов": "untagged", "всё размечено ✓": "everything tagged ✓", "практики подряд": "of practice in a row",
+  "минут рисования за неделю": "minutes drawn this week", "Практика": "Practice", "последние 16 недель": "last 16 weeks",
+  "Новое с": "New from", "все пины": "all pins", "Недавно добавленные": "Recently added", "Давно не открывали": "Not opened in a while",
+  "вспомнить старое": "rediscover", "Ваши темы": "Your topics", "мин, набросков": "min, sketches", "без практики": "no practice",
+  "Добавьте картинки в библиотеку": "Add images to your library", "Тема дня": "Topic of the day", "Референс дня": "Reference of the day",
+  "Другой референс": "Another reference", "Вся тема": "Whole topic", "Рисовать 10 мин": "Draw for 10 min",
+  "Нарисуй это": "Draw this", "Задания появятся из ваших тем": "Challenges will come from your topics", "Разметить файлы": "Tag files",
+  "Условие": "Rule", "Время": "Time", "Другое": "Another",
+
+  // ---------------------------------------------------------------- organize
+  "Порядок в библиотеке": "Organize your library",
+  "Сначала разберём файлы — тогда референс дня, задания и подборки будут строиться из ваших тем, а не наугад.":
+    "Let's sort your files first — then the reference of the day, challenges and collections will be built from your own topics instead of at random.",
+  "Библиотека в хорошей форме": "Your library is in good shape", "Есть что разобрать": "Some things to sort out", "Начнём с папок": "Let's start with folders",
+  "Размечено тегами": "Tagged", "тегов": "tags", "Добавьте папки, где лежат ваши референсы, арты и уроки.": "Add the folders where your references, artworks and tutorials live.",
+  "дубликатов": "duplicates", "пропавших": "missing", "Папки и их тип": "Folders and their type",
+  "Тип помогает разделять референсы, ваши работы и уроки — задания «перерисуй свою работу» и «изучи урок» берутся отсюда.":
+    "The type separates references, your own works and tutorials — challenges like “redraw your work” are based on it.",
+  "Разметить": "Tag", "Найти папки с картинками": "Find folders with images", "Указать папку вручную": "Choose folder manually",
+  "Теги из имён файлов и папок": "Tags from file and folder names",
+  "Refis нашёл повторяющиеся слова в названиях. Примените подходящие — одним кликом тег встанет на все такие файлы. ✎ — поправить название перед применением.":
+    "Refis found repeated words in names. Apply the useful ones — one click tags all matching files. ✎ — edit the name before applying.",
+  "Ищу…": "Searching…",
+  "Файлы показываются по одному, рядом — подсказки тегов (из соседей по папке, имени файла, популярные). Клавиши":
+    "Files are shown one at a time with tag suggestions (from folder neighbours, the file name, popular tags). Keys",
+  "ставят подсказки": "apply suggestions", "дальше.": "next.", "Начать разметку": "Start tagging", "Уборка": "Cleanup",
+  "Пропавшие файлы": "Missing files", "Без тегов в библиотеке": "Untagged in library", "подключено": "connected",
+  "Подключите свои доски — новые пины будут появляться в Refis, их можно сохранять в библиотеку с тегом доски и использовать в заданиях.":
+    "Connect your boards — new pins will appear in Refis; save them to your library with the board's tag and use them in challenges.",
+  "Открыть Pinterest": "Open Pinterest", "Тип папки": "Folder type", "применён ко всем её файлам": "applied to all its files",
+  "Применить предложенные теги": "Apply suggested tags", "Разметить оставшиеся": "Tag the remaining", "Перейти к практике": "Go to practice",
+  "Ищу папки с картинками в «Изображениях», «Загрузках», на рабочем столе и других дисках…":
+    "Looking for image folders in Pictures, Downloads, Desktop and other drives…",
+  "Новых папок с картинками не нашлось. Если ваши файлы лежат в другом месте — нажмите «Указать папку вручную».":
+    "No new image folders found. If your files are somewhere else, use “Choose folder manually”.",
+  "Добавить отмеченные": "Add selected", "Файлы останутся на месте": "Files stay where they are", "Отметьте хотя бы одну папку": "Select at least one folder",
+  "Добавлено папок": "Folders added", "сканирую…": "scanning…",
+  "Новых предложений нет — всё, что можно было понять из названий, уже размечено.":
+    "No new suggestions — everything that could be inferred from names is already tagged.",
+  "из папок": "from folders", "из имён": "from names", " · тег уже есть": " · tag exists", "Изменить название": "Edit name", "Не подходит": "Dismiss",
+  "Применить все": "Apply all", "Название тега": "Tag name",
+  "Например, переведите «hand» в «руки» или сделайте вложенным: «анатомия/руки».": "For example, rename “hand” to “hands” or nest it: “anatomy/hands”.",
+  "Применено тегов": "Tags applied", "Файлов без тегов нет 🎉": "No untagged files 🎉",
+  "Подсказки — клавиши 1–9": "Suggestions — keys 1–9", "недавно": "recent",
+  "<span class=\"hint\">подсказок нет — введите свой тег</span>": "<span class=\"hint\">no suggestions — type your own tag</span>",
+  "Enter в пустом поле — дальше · Esc — закончить": "Enter in an empty field — next · Esc — finish", "свой тег и Enter": "your tag and Enter",
+  "Разметка закончена": "Tagging finished", "Готово ✕": "Done ✕",
+
+  // ---------------------------------------------------------------- pinterest
+  "Новые пины с ваших досок. Сохраните нужные в библиотеку — они получат тег доски и попадут в задания.":
+    "New pins from your boards. Save the ones you like — they get the board's tag and show up in challenges.",
+  "Обновить": "Refresh", "Подключить доску": "Connect board", "Все доски": "All boards", "Пины из вашей домашней ленты": "Pins from your home feed",
+  "Новые": "New", "Сохранённые": "Saved", "Скрытые": "Hidden", "Выбрать все": "Select all", "Скрыть": "Hide", "В библиотеку": "To library",
+  "Вернуть в новые": "Back to new", "Подключите": "Connect", "Рекомендации.": "Recommendations.",
+  "Откройте Pinterest внутри Refis и войдите в свой аккаунт — пока вы листаете домашнюю ленту":
+    "Open Pinterest inside Refis and sign in — while you scroll your home feed",
+  "Refis собирает её пины в «Рекомендации», а на каждом пине появляется кнопка «＋ Refis» для сохранения в библиотеку.":
+    "Refis collects its pins into “Recommendations”, and every pin gets a “＋ Refis” button to save it to your library.",
+  "Открыть Pinterest в": "Open Pinterest in", "Доски.": "Boards.",
+  "Или вставьте ссылку на свою публичную доску или профиль — Refis будет сам забирать новые пины.":
+    "Or paste a link to your public board or profile — Refis will fetch new pins on its own.",
+  "Они получат тег по названию доски и попадут в задания «Нарисуй это».": "They get a tag from the board name and show up in “Draw this” challenges.",
+  "https://pinterest.com/имя/название-доски": "https://pinterest.com/name/board-name", "Подключить": "Connect", "Примеры": "Examples",
+  "доска": "a board", "последние пины профиля.": "latest pins from a profile.", "Работают только": "Only", "публичные": "public",
+  "доски — секретные Pinterest не отдаёт без официального API.": "boards work — Pinterest doesn't share secret boards without its official API.",
+  "Ссылку на доску можно скопировать в браузере или в приложении (Поделиться → Копировать ссылку).":
+    "You can copy a board link in the browser or the app (Share → Copy link).",
+  "Подключаю…": "Connecting…", "Подключено, но лента не загрузилась": "Connected, but the feed didn't load", "Подключено": "Connected",
+  "Ссылка на публичную доску или профиль Pinterest.": "Link to a public Pinterest board or profile.", "https://pinterest.com/имя/доска": "https://pinterest.com/name/board",
+  "Новых пинов нет": "No new pins", "Всё разобрано. Refis проверяет доски каждые несколько часов, можно обновить вручную.":
+    "All caught up. Refis checks your boards every few hours; you can refresh manually.", "Показано": "Showing",
+  "Сохранить в библиотеку…": "Save to library…", "Открыть на Pinterest": "Open on Pinterest", "Скрыто": "Hidden", "Возвращено в новые": "Moved back to new",
+  "Сначала добавьте папку библиотеки (раздел «Порядок»)": "Add a library folder first (Organize page)",
+  "Картинки скачаются в оригинальном размере. Теги — по названию доски и «pinterest», ссылка на пин — в поле «Источник».":
+    "Images are downloaded at full size. Tags — from the board name and “pinterest”, the pin link goes to “Source”.",
+  "Пусто — отдельная подпапка для каждой доски: Pinterest\\название": "Empty — a separate subfolder per board: Pinterest\\name",
+  "Свои теги вместо автоматических": "Custom tags instead of automatic", "Скачиваю…": "Downloading…", "Сохранено": "Saved",
+  "не удалось": "failed", "нет связи?)": "no connection?)", "В библиотеке": "In library",
+  "Войдите в Pinterest и листайте ленту — рекомендации появятся здесь": "Sign in to Pinterest and scroll your feed — recommendations will appear here",
+  "Сбор рекомендаций и кнопка «＋ Refis» работают в окне приложения Refis, а не в браузере":
+    "Collecting recommendations and the “＋ Refis” button only work in the Refis app window, not in a browser",
+  "Новых": "New", "Настройки…": "Settings…", "Открыть в браузере": "Open in browser", "Отключить…": "Disconnect…",
+  "Отключить доску?": "Disconnect board?", "исчезнет из Refis вместе с несохранёнными пинами. Уже сохранённые картинки останутся в библиотеке.":
+    "will disappear from Refis along with unsaved pins. Images you've already saved stay in your library.", "Отключить": "Disconnect",
+  "Название": "Name", "Тег для сохранённых пинов": "Tag for saved pins", "например: анатомия/торс": "e.g. anatomy/torso",
+  "Сохранять новые пины в библиотеку автоматически": "Save new pins to the library automatically", "Папка для автосохранения": "Folder for auto-save",
+  "Выберите папку для автосохранения": "Choose a folder for auto-save", "Обновляю": "Refreshing",
+
+  // ---------------------------------------------------------------- boards
+  "Новая доска": "New board", "<div class=\"none\">пусто</div>": "<div class=\"none\">empty</div>",
+  "Переименовать…": "Rename…", "Название доски": "Board name", "Дублировать": "Duplicate", "Удалить…": "Delete…", "Удалить доску?": "Delete board?",
+  "исчезнет. Картинки в библиотеке останутся.": "will be deleted. Images in your library stay.",
+  "Из библиотеки": "From library", "Заметка (N)": "Note (N)", "Заметка": "Note", "Аккуратно разложить (A)": "Arrange neatly (A)", "Упорядочить": "Arrange",
+  "Показать всё (F)": "Fit all (F)", "Окно поверх всех — удобно рисовать рядом": "Window always on top — handy while drawing", "Поверх окон": "On top",
+  "Сохранить доску картинкой": "Save board as image", "Пустая доска": "Empty board",
+  "Перетащите сюда картинки из библиотеки (＋ Из библиотеки)": "Drag images here from your library (＋ From library)",
+  "файлы из проводника или вставьте из буфера": "files from Explorer, or paste from clipboard",
+  "Колесо — зум · тянуть фон — двигать · Shift+тянуть — выделить": "Wheel — zoom · drag background — pan · Shift+drag — select",
+  "H зеркало · G ч/б · ] [ слои · Ctrl+D копия · Ctrl+Z отмена": "H mirror · G b/w · ] [ layers · Ctrl+D duplicate · Ctrl+Z undo",
+  "Поиск: слова, #тег": "Search: words, #tag", "Перетащите картинку на доску или кликните, чтобы добавить": "Drag an image onto the board or click to add it",
+  "Отменять нечего": "Nothing to undo", "На доску можно добавить только картинки": "Only images can be added to a board", "Добавлено на доску": "Added to board",
+  "Нечего упорядочивать": "Nothing to arrange", "Заметка здесь": "Note here", "Показать всё": "Fit all", "Масштаб 100%": "Zoom 100%", "Выделить всё": "Select all",
+  "Редактировать": "Edit", "Цвет: жёлтый": "Color: yellow", "Цвет: розовый": "Color: pink", "Цвет: голубой": "Color: blue", "Цвет: зелёный": "Color: green",
+  "Цвет: тёмный": "Color: dark", "Отразить": "Mirror", "Открыть в просмотре": "Open in viewer", "На передний план": "Bring to front", "На задний план": "Send to back",
+  "Сбросить размер": "Reset size", "Картинку из браузера лучше скопировать (ПКМ → Копировать) и вставить Ctrl+V": "For images from a browser, copy them (right-click → Copy) and paste with Ctrl+V",
+  "Доска пуста": "The board is empty", "Собираю картинку…": "Rendering image…", "Добавить на доску": "Add to board",
+  "<span class=\"hint\">досок пока нет</span>": "<span class=\"hint\">no boards yet</span>", "или новая": "or a new one", "Название новой доски": "New board name",
+
+  // ---------------------------------------------------------------- profile
+  "Как к вам обращаться?": "What should we call you?", "Практикуется с": "Practicing since",
+  "Здесь появится ваш прогресс после первой тренировки": "Your progress will appear here after your first practice", "достижений": "achievements",
+  "Минуты рисования по неделям": "Minutes drawn per week", "последние полгода": "last six months", "Показать таблицей": "Show as table",
+  "Неделя с": "Week of", "Минут": "Minutes", "Сессий": "Sessions", "пока пусто": "nothing yet", "Любимые темы": "Favorite topics", "минуты практики": "practice minutes",
+  "Темы появятся, когда вы порисуете по заданиям или референсу дня.": "Topics will appear after you draw challenges or the reference of the day.",
+  "Давно не практиковали": "Not practiced lately", "больше месяца": "over a month", "Эти темы чаще попадают в «Тему дня» и задания.": "These topics show up more often in the Topic of the day and challenges.",
+  "Вы прошлись по всем крупным темам за последний месяц": "You've covered all your major topics this month", "Достижения": "Achievements",
+  "получено": "earned", "по дате файла": "by file date", "Последние сессии": "Recent sessions", "Наброски": "Sketches", "Задание": "Challenge",
+  "Пока ни одной — начните с «Нарисуй это» на странице «Сегодня».": "None yet — start with “Draw this” on the Today page.",
+  "Имя сохранено": "Name saved", "неделя с": "week of", "дней подряд сейчас · лучшая серия": "days in a row now · best streak", "набросков": "sketches",
+  "с практикой": "with practice",
+
+  // ---------------------------------------------------------------- settings
+  "Внешний вид": "Appearance", "Тема": "Theme", "Просмотр и тренировка всегда тёмные — так точнее видны тона": "The viewer and practice are always dark — values read more accurately",
+  "Тёмная": "Dark", "Светлая": "Light", "Как в системе": "System", "Язык": "Language", "Русский": "Русский", "Анимации": "Animations",
+  "«Минимум» — для слабых компьютеров и если движение отвлекает": "“Minimal” — for slower computers or if motion is distracting",
+  "Полные": "Full", "Минимум": "Minimal", "Цветной фон": "Color background", "Медленно плывущие пятна за интерфейсом": "Slowly drifting color blobs behind the interface",
+  "Открывать при запуске": "Open on startup", "Последнюю страницу": "Last page", "Данные и резервные копии": "Data and backups",
+  "Папка данных": "Data folder", "Каталог, теги, заметки, доски, превью": "Catalog, tags, notes, boards, thumbnails",
+  "Автоматическая копия": "Automatic backup", "Раз в день при запуске, хранятся последние 7": "Once a day on startup, the last 7 are kept",
+  "Резервная копия": "Backup", "Теги, оценки, заметки, доски и журнал практики. Сами картинки остаются в ваших папках.":
+    "Tags, ratings, notes, boards and practice log. The images themselves stay in your folders.",
+  "Создать копию": "Create backup", "Восстановить из файла…": "Restore from file…", "Восстановить": "Restore",
+  "Проверять подключённые доски": "Check connected boards", "Каждые несколько часов, пока Refis открыт": "Every few hours while Refis is open",
+  "Собирать рекомендации": "Collect recommendations", "Пины из вашей домашней ленты, пока вы листаете её в окне «Pinterest» внутри":
+    "Pins from your home feed while you scroll it in the Pinterest window inside", "Обновления": "Updates", "Версия": "Version",
+  "Проверка при запуске": "Checked on startup", "Проверить сейчас": "Check now", "Проверять при запуске": "Check on startup",
+  "Только запрос номера последней версии на GitHub — никаких данных о вас": "Only asks GitHub for the latest version number — no data about you",
+  "Библиотека референсов для художников. Свободная программа под лицензией MIT.": "A reference library for artists. Free software under the MIT license.",
+  "Сообщить об ошибке": "Report a bug", "Горячие клавиши": "Keyboard shortcuts", "Telegram автора": "Author's Telegram",
+  "Копия сохранена": "Backup saved", "Не удалось проверить — нет связи с GitHub или релизов ещё нет": "Couldn't check — no connection to GitHub or no releases yet",
+  "Доступна версия": "Version available:", "Установлена последняя версия": "You have the latest version", "Скачать установщик": "Download installer",
+  "Открыть страницу релиза": "Open release page", "Установщик обновит программу, данные сохранятся": "The installer updates the app; your data is kept",
+  "Восстановить из копии?": "Restore from backup?",
+  "Текущие теги, заметки и доски заменятся данными из копии (сами картинки на диске не трогаются). Нынешнее состояние будет сохранено в отдельную копию. Восстановление применится после перезапуска Refis.":
+    "Current tags, notes and boards will be replaced with the backup (images on disk are not touched). The current state is saved to a separate backup. The restore applies after Refis restarts.",
+  "Почти готово": "Almost done", "Копия подготовлена. Перезапустите Refis, чтобы применить её.": "The backup is ready. Restart Refis to apply it.",
+  "Перезапустить": "Restart", "Вышла версия": "Version released:",
+  "Командная панель — быстрый переход куда угодно": "Command palette — jump anywhere fast",
+  "Сегодня, Библиотека, Доски, Порядок, Pinterest": "Today, Library, Boards, Organize, Pinterest", "Поиск": "Search", "Пробел, Enter": "Space, Enter",
+  "Оценка / сброс": "Rating / clear", "Добавить тег": "Add tag", "Панель деталей": "Details panel", "Копировать картинку / вставить из буфера": "Copy image / paste from clipboard",
+  "Просмотр: зеркало, ч/б, пятна, сетка, поворот": "Viewer: mirror, b/w, masses, grid, rotate", "Видео: кадр назад/вперёд, скорость": "Video: frame back/forward, speed",
+  "Доска: отмена, копия, упорядочить, показать всё, заметка": "Board: undo, duplicate, arrange, fit all, note", "Разметка: подсказка, дальше": "Tagging: suggestion, next",
+
+  // ---------------------------------------------------------------- main: status, palette, drops
+  "Сканирую… новых": "Scanning… new", "Создаю превью… осталось": "Creating thumbnails… left", "ffmpeg не найден — нет превью видео": "ffmpeg not found — no video thumbnails",
+  "Доступно только в приложении": "Only available in the app", "📌 Окно поверх остальных": "📌 Window always on top", "Окно больше не поверх остальных": "Window is no longer on top",
+  "Переход": "Go to", "Действия": "Actions", "Нарисуй это — задание из моих тем": "Draw this — a challenge from my topics",
+  "Быстрая разметка файлов без тегов": "Quick tagging of untagged files", "Новая доска": "New board", "Пересканировать все папки": "Rescan all folders",
+  "Сканирую…": "Scanning…", "Показать/скрыть панель деталей": "Show/hide details panel", "Окно поверх всех окон": "Window always on top",
+  "Профиль и статистика": "Profile and stats", "Создать резервную копию": "Create backup", "Копия": "Backup", "Файлы без тегов": "Untagged files",
+  "Только видео": "Videos only", "Случайный порядок": "Random order", "Сохранённые поиски": "Saved searches",
+  "Что сделать? Поиск по командам, тегам, доскам…": "What do you want to do? Search commands, tags, boards…", "Здесь нет картинок или видео": "No images or videos here",
+  "Отпустите, чтобы добавить": "Drop to add", "Картинка скопирована — вставьте её в редактор (Ctrl+V)": "Image copied — paste it into your editor (Ctrl+V)",
+  "Не удалось скопировать картинку": "Couldn't copy the image", "Скопировано": "Copied",
+};

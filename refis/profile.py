@@ -5,6 +5,7 @@ from collections import defaultdict
 
 from fastapi import APIRouter
 
+from .i18n import tr
 from . import db
 
 router = APIRouter(prefix="/api")
@@ -96,7 +97,7 @@ def profile():
     tagged_share = lib["tagged"] / lib["total"] if lib["total"] else 0
 
     def ach(aid, icon, title, desc, value, goal):
-        return {"id": aid, "icon": icon, "title": title, "desc": desc, "value": round(value, 1), "goal": goal,
+        return {"id": aid, "icon": icon, "title": tr(title), "desc": tr(desc), "value": round(value, 1), "goal": goal,
                 "progress": min(1, value / goal) if goal else 0, "done": value >= goal}
 
     achievements = [

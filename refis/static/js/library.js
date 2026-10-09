@@ -1,4 +1,5 @@
 // Библиотека: фильтры, сетка с раскладкой, выделение, панель деталей, теги, папки, загрузка.
+import { tr, plural } from "./i18n.js";
 import {
   $, $$, api, esc, store, toast, menu, modal, confirmDialog, promptDialog, emit, on,
   KINDS, fmtDur, fmtSize, files, thumbUrl, fileUrl, copyImage, copyText, isTyping,
@@ -80,7 +81,7 @@ function persist() {
 
 function cardInner(it) {
   const media = it.thumb_state === -1
-    ? `<div class="ph">${esc(it.ext.toUpperCase())}<br><small>нет превью</small></div>`
+    ? `<div class="ph">${esc(it.ext.toUpperCase())}<br><small>${tr("нет превью")}</small></div>`
     : `<img decoding="async" src="${thumbUrl(it)}" alt="">`;
   return `<div class="ci${it.thumb_state === -1 ? " ready" : ""}">${media}</div>
     <i class="dot kind k-${it.kind}" title="${KINDS[it.kind]}"></i>
@@ -216,7 +217,7 @@ $("#grid").addEventListener("error", (e) => {
 }, true);
 
 function updateCount() {
-  $("#countText").textContent = files(state.total) + (state.selected.size ? ` · выбрано ${state.selected.size}` : "");
+  $("#countText").textContent = files(state.total) + (state.selected.size ? ` · ${tr("выбрано")} ${state.selected.size}` : "");
 }
 
 function renderEmpty() {
@@ -224,13 +225,13 @@ function renderEmpty() {
   empty.hidden = state.total > 0;
   if (state.total) return;
   if (!state.folders.length) {
-    empty.innerHTML = `<div class="empty-state"><div class="big">🗂️</div><h2>Библиотека пока пуста</h2>
-      <p>Добавьте папку со своими референсами, артами или уроками. Файлы останутся на месте — Refis только построит каталог.</p>
-      <button class="primary" id="emptyAdd">＋ Добавить папку</button></div>`;
+    empty.innerHTML = `<div class="empty-state"><div class="big">🗂️</div><h2>${tr("Библиотека пока пуста")}</h2>
+      <p>${tr("Добавьте папку со своими референсами, артами или уроками. Файлы останутся на месте — Refis только построит каталог.")}</p>
+      <button class="primary" id="emptyAdd">＋ ${tr("Добавить папку")}</button></div>`;
     $("#emptyAdd").onclick = () => folderDialog();
   } else {
-    empty.innerHTML = `<div class="empty-state"><div class="big">🔍</div><h2>Ничего не нашлось</h2>
-      <p>Попробуйте убрать часть фильтров.</p><button id="emptyReset">Сбросить фильтры</button></div>`;
+    empty.innerHTML = `<div class="empty-state"><div class="big">🔍</div><h2>${tr("Ничего не нашлось")}</h2>
+      <p>${tr("Попробуйте убрать часть фильтров.")}</p><button id="emptyReset">${tr("Сбросить фильтры")}</button></div>`;
     $("#emptyReset").onclick = () => applyQuery({});
   }
 }
@@ -290,17 +291,17 @@ grid.addEventListener("contextmenu", (e) => {
   const one = ids.length === 1;
   const it = state.items.find((i) => i.id === id);
   menu(e, [
-    one && ["Открыть", () => view(id), "Пробел"],
-    one && it.type === "image" && ["Копировать картинку", () => copyImage(fileUrl(id)), "Ctrl C"],
-    one && ["Показать в проводнике", () => api(`/media/${id}/reveal`, { method: "POST" })],
-    one && ["Открыть в программе", () => api(`/media/${id}/open`, { method: "POST" })],
+    one && [tr("Открыть"), () => view(id), tr("Пробел")],
+    one && it.type === "image" && [tr("Копировать картинку"), () => copyImage(fileUrl(id)), "Ctrl C"],
+    one && [tr("Показать в проводнике"), () => api(`/media/${id}/reveal`, { method: "POST" })],
+    one && [tr("Открыть в программе"), () => api(`/media/${id}/open`, { method: "POST" })],
     "-",
-    ["На доску…", () => addToBoardDialog(ids)],
-    ["Тренировка по выбранным", () => practiceDialog({ ids })],
+    [tr("На доску…"), () => addToBoardDialog(ids)],
+    [tr("Тренировка по выбранным"), () => practiceDialog({ ids })],
     "-",
-    ["В избранное", () => bulk({ ids, favorite: true }), "F"],
-    ["Убрать из избранного", () => bulk({ ids, favorite: false })],
-    ...Object.entries(KINDS).map(([k, v]) => [`Тип: ${v}`, () => bulk({ ids, kind: k })]),
+    [tr("В избранное"), () => bulk({ ids, favorite: true }), "F"],
+    [tr("Убрать из избранного"), () => bulk({ ids, favorite: false })],
+    ...Object.entries(KINDS).map(([k, v]) => [`${tr("Тип")}: ${v}`, () => bulk({ ids, kind: k })]),
   ]);
 });
 
@@ -413,11 +414,11 @@ export async function renderDetails() {
   if (!ids.length) {
     if (d.dataset.mode === "none") return;
     d.dataset.mode = "none";
-    d.innerHTML = `<div class="placeholder">Выберите файл, чтобы увидеть детали<br><br>
-      <small><kbd>Клик</kbd> выбрать · <kbd>Ctrl</kbd>/<kbd>Shift</kbd> несколько<br>
-      <kbd>Пробел</kbd> просмотр · <kbd>1</kbd>–<kbd>5</kbd> оценка · <kbd>F</kbd> избранное<br>
-      <kbd>T</kbd> добавить тег · <kbd>Ctrl C</kbd> копировать<br>
-      Перетащите или вставьте (<kbd>Ctrl V</kbd>) картинку, чтобы добавить</small></div>`;
+    d.innerHTML = `<div class="placeholder">${tr("Выберите файл, чтобы увидеть детали")}<br><br>
+      <small><kbd>${tr("Клик")}</kbd> ${tr("выбрать")} · <kbd>Ctrl</kbd>/<kbd>Shift</kbd> ${tr("несколько")}<br>
+      <kbd>${tr("Пробел")}</kbd> ${tr("просмотр")} · <kbd>1</kbd>–<kbd>5</kbd> ${tr("оценка")} · <kbd>F</kbd> ${tr("избранное")}<br>
+      <kbd>T</kbd> ${tr("добавить тег")} · <kbd>Ctrl C</kbd> ${tr("копировать")}<br>
+      ${tr("Перетащите или вставьте")} (<kbd>Ctrl V</kbd>) ${tr("картинку, чтобы добавить")}</small></div>`;
     return;
   }
   if (ids.length > 1) { d.dataset.mode = "bulk"; return renderBulk(ids); }
@@ -427,34 +428,34 @@ export async function renderDetails() {
   if (my !== detailsReq) return;
   d.dataset.mode = "one"; d.dataset.id = id; delete d.dataset.stale;
   d.innerHTML = `
-    <div class="dprev" title="Открыть просмотр"><img src="${thumbUrl(m)}" alt=""></div>
+    <div class="dprev" title="${tr("Открыть просмотр")}"><img src="${thumbUrl(m)}" alt=""></div>
     <div><div class="dname">${esc(m.name)}<span class="muted">.${esc(m.ext)}</span></div></div>
-    ${m.type === "image" ? `<div class="swatches" id="dPal" title="Палитра — клик копирует цвет"></div>` : ""}
+    ${m.type === "image" ? `<div class="swatches" id="dPal" title="${tr("Палитра — клик копирует цвет")}"></div>` : ""}
     <div class="row">
       <div class="stars">${[1, 2, 3, 4, 5].map((n) => `<button data-r="${n}" class="${n <= m.rating ? "on" : ""}">★</button>`).join("")}</div>
-      <button id="dFav" class="favbtn ${m.favorite ? "on" : ""}" style="margin-left:auto">${m.favorite ? "♥ В избранном" : "♡ В избранное"}</button>
+      <button id="dFav" class="favbtn ${m.favorite ? "on" : ""}" style="margin-left:auto">${m.favorite ? tr("♥ В избранном") : tr("♡ В избранное")}</button>
     </div>
-    <div class="field"><label>Теги</label>${tagEditor(m.tags)}</div>
-    <div class="field"><label>Тип</label>
+    <div class="field"><label>${tr("Теги")}</label>${tagEditor(m.tags)}</div>
+    <div class="field"><label>${tr("Тип")}</label>
       <select id="dKind">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}"${k === m.kind ? " selected" : ""}>${v}</option>`).join("")}</select></div>
-    <div class="field"><label>Источник, автор, ссылка</label><input id="dSource" type="text" value="${esc(m.source)}" placeholder="pinterest, artstation, имя автора…"></div>
-    <div class="field"><label>Заметки</label><textarea id="dNotes" placeholder="Что здесь полезного, что изучить…">${esc(m.notes)}</textarea></div>
+    <div class="field"><label>${tr("Источник, автор, ссылка")}</label><input id="dSource" type="text" value="${esc(m.source)}" placeholder="${tr("pinterest, artstation, имя автора…")}"></div>
+    <div class="field"><label>${tr("Заметки")}</label><textarea id="dNotes" placeholder="${tr("Что здесь полезного, что изучить…")}">${esc(m.notes)}</textarea></div>
     <div class="row">
-      ${m.type === "image" ? `<button id="dDraw" class="primary">⏱ Рисовать</button><button id="dCopy">Копировать</button>` : ""}
-      <button id="dBoard">＋ Доска</button>
+      ${m.type === "image" ? `<button id="dDraw" class="primary">⏱ ${tr("Рисовать")}</button><button id="dCopy">${tr("Копировать")}</button>` : ""}
+      <button id="dBoard">＋ ${tr("Доска")}</button>
     </div>
-    <div class="row"><button id="dReveal">Показать в проводнике</button><button id="dOpen">Открыть в программе</button></div>
+    <div class="row"><button id="dReveal">${tr("Показать в проводнике")}</button><button id="dOpen">${tr("Открыть в программе")}</button></div>
     <div class="meta">
-      ${m.width ? `<span>Размер</span><span>${m.width}×${m.height}</span>` : ""}
-      ${m.duration ? `<span>Длина</span><span>${fmtDur(m.duration)}</span>` : ""}
-      <span>Файл</span><span>${fmtSize(m.size)}</span>
-      <span>Изменён</span><span>${new Date(m.mtime * 1000).toLocaleDateString()}</span>
-      ${m.view_count ? `<span>Открыт</span><span>${m.view_count} раз</span>` : ""}
-      <span>Путь</span><span class="path">${esc(m.path)}</span>
+      ${m.width ? `<span>${tr("Размер")}</span><span>${m.width}×${m.height}</span>` : ""}
+      ${m.duration ? `<span>${tr("Длина")}</span><span>${fmtDur(m.duration)}</span>` : ""}
+      <span>${tr("Файл")}</span><span>${fmtSize(m.size)}</span>
+      <span>${tr("Изменён")}</span><span>${new Date(m.mtime * 1000).toLocaleDateString()}</span>
+      ${m.view_count ? `<span>${tr("Открыт")}</span><span>${m.view_count} ${plural(m.view_count, "раз", "раза", "раз")}</span>` : ""}
+      <span>${tr("Путь")}</span><span class="path">${esc(m.path)}</span>
     </div>
-    ${m.duplicates?.length ? `<div class="field dups"><label>Дубликаты (${m.duplicates.length})</label>
-      <ul class="list">${m.duplicates.map((x) => `<li data-id="${x.id}" title="Показать в проводнике">${esc(x.path)}</li>`).join("")}</ul></div>` : ""}
-    ${m.missing ? `<p style="color:var(--danger);margin:0">Файл не найден на диске.</p><button class="danger" id="dForget">Убрать из каталога</button>` : ""}
+    ${m.duplicates?.length ? `<div class="field dups"><label>${tr("Дубликаты")} (${m.duplicates.length})</label>
+      <ul class="list">${m.duplicates.map((x) => `<li data-id="${x.id}" title="${tr("Показать в проводнике")}">${esc(x.path)}</li>`).join("")}</ul></div>` : ""}
+    ${m.missing ? `<p style="color:var(--danger);margin:0">${tr("Файл не найден на диске.")}</p><button class="danger" id="dForget">${tr("Убрать из каталога")}</button>` : ""}
   `;
   const save = async (patch) => {
     const upd = await api(`/media/${id}`, { method: "PATCH", body: patch });
@@ -485,7 +486,7 @@ export async function renderDetails() {
   $("#dFav").onclick = async (e) => {
     m.favorite = m.favorite ? 0 : 1;
     e.currentTarget.classList.toggle("on", !!m.favorite);
-    e.currentTarget.textContent = m.favorite ? "♥ В избранном" : "♡ В избранное";
+    e.currentTarget.textContent = m.favorite ? tr("♥ В избранном") : tr("♡ В избранное");
     await save({ favorite: !!m.favorite });
   };
   bindTagEditor(d, m.tags, async (tags) => { m.tags = tags; await save({ tags }); loadTags(); });
@@ -504,19 +505,19 @@ function renderBulk(ids) {
   const common = {};
   items.forEach((i) => i.tags.forEach((t) => (common[t] = (common[t] || 0) + 1)));
   d.innerHTML = `
-    <div class="dname">Выбрано: ${ids.length}</div>
-    <div class="field"><label>Добавить теги всем</label>
-      <div class="tagedit"><input id="bAdd" list="tagOptions" placeholder="тег и Enter"></div></div>
-    <div class="field"><label>Теги выбранных — × снимает со всех</label>
+    <div class="dname">${tr("Выбрано")}: ${ids.length}</div>
+    <div class="field"><label>${tr("Добавить теги всем")}</label>
+      <div class="tagedit"><input id="bAdd" list="tagOptions" placeholder="${tr("тег и")} Enter"></div></div>
+    <div class="field"><label>${tr("Теги выбранных — × снимает со всех")}</label>
       <div class="row">${Object.entries(common).sort().map(([t, n]) =>
-        `<span class="chip">${esc(t)} <small class="muted">${n}</small><button data-t="${esc(t)}">×</button></span>`).join("") || '<span class="hint">тегов нет</span>'}</div></div>
-    <div class="field"><label>Тип</label>
-      <select id="bKind"><option value="">— не менять —</option>${Object.entries(KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
-    <div class="field"><label>Оценка</label>
-      <div class="row stars">${[1, 2, 3, 4, 5].map((n) => `<button data-r="${n}">★</button>`).join("")}<button data-r="0" class="mini ghost">сброс</button></div></div>
-    <div class="row"><button id="bFav">♥ В избранное</button><button id="bUnfav">Убрать из избранного</button></div>
-    <div class="row"><button id="bPractice" class="primary">⏱ Тренировка</button><button id="bBoard">＋ На доску</button></div>
-    <div class="row"><button id="bForget" class="danger" title="Файлы на диске останутся">Убрать из каталога</button></div>`;
+        `<span class="chip">${esc(t)} <small class="muted">${n}</small><button data-t="${esc(t)}">×</button></span>`).join("") || tr('<span class="hint">тегов нет</span>')}</div></div>
+    <div class="field"><label>${tr("Тип")}</label>
+      <select id="bKind"><option value="">— ${tr("не менять")} —</option>${Object.entries(KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+    <div class="field"><label>${tr("Оценка")}</label>
+      <div class="row stars">${[1, 2, 3, 4, 5].map((n) => `<button data-r="${n}">★</button>`).join("")}<button data-r="0" class="mini ghost">${tr("сброс")}</button></div></div>
+    <div class="row"><button id="bFav">♥ ${tr("В избранное")}</button><button id="bUnfav">${tr("Убрать из избранного")}</button></div>
+    <div class="row"><button id="bPractice" class="primary">⏱ ${tr("Тренировка")}</button><button id="bBoard">＋ ${tr("На доску")}</button></div>
+    <div class="row"><button id="bForget" class="danger" title="${tr("Файлы на диске останутся")}">${tr("Убрать из каталога")}</button></div>`;
   const add = $("#bAdd");
   add.onkeydown = async (e) => {
     if (e.key !== "Enter" && e.key !== ",") return;
@@ -524,13 +525,13 @@ function renderBulk(ids) {
     const t = add.value.trim();
     if (!t) return;
     await bulk({ ids, add_tags: t.split(",") });
-    toast(`Тег «${t}» добавлен к ${files(ids.length)}`);
+    toast(`${tr("Тег")} «${t}» ${tr("добавлен к")} ${files(ids.length)}`);
   };
   $$(".chip button", d).forEach((b) => (b.onclick = async () => {
     const t = b.dataset.t;
     const had = items.filter((i) => i.tags.includes(t)).map((i) => i.id);
     await bulk({ ids, remove_tags: [t] });
-    toast(`Тег «${t}» снят с ${files(had.length)}`, { action: "Отменить", life: 6000, onAction: () => bulk({ ids: had, add_tags: [t] }) });
+    toast(`${tr("Тег")} «${t}» ${tr("снят с")} ${files(had.length)}`, { action: tr("Отменить"), life: 6000, onAction: () => bulk({ ids: had, add_tags: [t] }) });
   }));
   $("#bKind").onchange = (e) => e.target.value && bulk({ ids, kind: e.target.value });
   $$(".stars [data-r]", d).forEach((b) => (b.onclick = () => bulk({ ids, rating: +b.dataset.r })));
@@ -539,9 +540,9 @@ function renderBulk(ids) {
   $("#bPractice").onclick = () => practiceDialog({ ids });
   $("#bBoard").onclick = () => addToBoardDialog(ids);
   $("#bForget").onclick = () => confirmDialog(
-    "Убрать из каталога?",
-    `${files(ids.length)} исчезнут из Refis вместе с тегами и заметками. Сами файлы на диске останутся, а при следующем сканировании появятся снова, но уже без тегов.`,
-    async () => { await bulk({ ids, forget: true }); state.selected.clear(); renderDetails(); }, "Убрать");
+    tr("Убрать из каталога?"),
+    `${files(ids.length)} ${tr("исчезнут из Refis вместе с тегами и заметками. Сами файлы на диске останутся, а при следующем сканировании появятся снова, но уже без тегов.")}`,
+    async () => { await bulk({ ids, forget: true }); state.selected.clear(); renderDetails(); }, tr("Убрать"));
 }
 
 export async function bulk(body) {
@@ -558,7 +559,7 @@ export async function bulk(body) {
 
 function tagChip(t) { return `<span class="chip">${esc(t)}<button data-t="${esc(t)}">×</button></span>`; }
 function tagEditor(tags) {
-  return `<div class="tagedit">${tags.map(tagChip).join("")}<input list="tagOptions" placeholder="${tags.length ? "" : "добавить тег…"}"></div>`;
+  return `<div class="tagedit">${tags.map(tagChip).join("")}<input list="tagOptions" placeholder="${tags.length ? "" : tr("добавить тег…")}"></div>`;
 }
 function bindTagEditor(root, tags, onChange) {
   const box = $(".tagedit", root);
@@ -567,7 +568,7 @@ function bindTagEditor(root, tags, onChange) {
   const redraw = () => {
     $$(".chip", box).forEach((c) => c.remove());
     input.insertAdjacentHTML("beforebegin", cur.map(tagChip).join(""));
-    input.placeholder = cur.length ? "" : "добавить тег…";
+    input.placeholder = cur.length ? "" : tr("добавить тег…");
   };
   box.onclick = (e) => {
     const b = e.target.closest("button[data-t]");
@@ -610,9 +611,9 @@ export function renderTags() {
       for (let i = 1; i < parts.length; i++) if (names.has(parts.slice(0, i).join("/"))) depth = i;
       const label = f ? t.name : parts.slice(depth).join("/");
       const cls = state.tags.includes(t.name) ? "inc" : state.ntags.includes(t.name) ? "exc" : "";
-      return `<li class="${cls}" data-tag="${esc(t.name)}" data-id="${t.id}" style="padding-left:${10 + depth * 14}px" title="${esc(t.name)} — клик: показать, Alt+клик: исключить">
+      return `<li class="${cls}" data-tag="${esc(t.name)}" data-id="${t.id}" style="padding-left:${10 + depth * 14}px" title="${esc(t.name)} — ${tr("клик: показать, Alt+клик: исключить")}">
         <span class="name">${depth ? "└ " : "# "}${esc(label)}</span><span class="cnt">${t.count}</span></li>`;
-    }).join("") || `<li class="empty">${f ? "нет совпадений" : "Тегов пока нет"}</li>`;
+    }).join("") || `<li class="empty">${f ? tr("нет совпадений") : tr("Тегов пока нет")}</li>`;
 }
 
 $("#tagFilter").oninput = renderTags;
@@ -636,14 +637,14 @@ $("#taglist").addEventListener("contextmenu", (e) => {
   e.preventDefault();
   const { tag, id } = li.dataset;
   menu(e, [
-    ["Показать только его", () => { state.tags = [tag]; state.ntags = []; renderTags(); emit("navigate", "library"); load(); }],
-    ["Исключить из поиска", () => toggleTag(tag, true), "Alt+клик"],
+    [tr("Показать только его"), () => { state.tags = [tag]; state.ntags = []; renderTags(); emit("navigate", "library"); load(); }],
+    [tr("Исключить из поиска"), () => toggleTag(tag, true), tr("Alt+клик")],
     "-",
-    ["Переименовать или объединить…", () => promptDialog("Переименовать тег",
-      "Если ввести имя существующего тега — теги объединятся. Вложенность через «/», например «анатомия/руки».",
+    [tr("Переименовать или объединить…"), () => promptDialog(tr("Переименовать тег"),
+      tr("Если ввести имя существующего тега — теги объединятся. Вложенность через «/», например «анатомия/руки»."),
       tag, async (name) => { await api(`/tags/${id}`, { method: "PATCH", body: { name } }); state.tags = []; state.ntags = []; await loadTags(); load(); })],
-    ["Удалить тег", () => confirmDialog("Удалить тег?", `Тег «${tag}» будет снят со всех файлов. Сами файлы не пострадают.`,
-      async () => { await api(`/tags/${id}`, { method: "DELETE" }); state.tags = state.tags.filter((x) => x !== tag); await loadTags(); load(); }, "Удалить")],
+    [tr("Удалить тег"), () => confirmDialog(tr("Удалить тег?"), `${tr("Тег")} «${tag}» ${tr("будет снят со всех файлов. Сами файлы не пострадают.")}`,
+      async () => { await api(`/tags/${id}`, { method: "DELETE" }); state.tags = state.tags.filter((x) => x !== tag); await loadTags(); load(); }, tr("Удалить"))],
   ]);
 });
 
@@ -671,7 +672,7 @@ function renderFolders() {
   $("#folderlist").innerHTML = state.folders.map((f) =>
     `<li data-id="${f.id}" class="${state.folder === f.id ? "active" : ""}" title="${esc(f.path)}">
       <i class="dot k-${f.kind}"></i><span class="name">${esc(f.path)}</span><span class="cnt">${f.count}</span></li>`).join("")
-    || `<li class="empty">Нажмите ＋, чтобы добавить</li>`;
+    || `<li class="empty">${tr("Нажмите ＋, чтобы добавить")}</li>`;
 }
 $("#folderlist").addEventListener("click", (e) => {
   const li = e.target.closest("li[data-id]");
@@ -688,8 +689,8 @@ $("#folderlist").addEventListener("contextmenu", (e) => {
   e.preventDefault();
   const f = state.folders.find((x) => x.id === +li.dataset.id);
   menu(e, [
-    ["Настройки папки…", () => folderSettings(f)],
-    ["Пересканировать", async () => { await api(`/folders/${f.id}/scan`, { method: "POST" }); emit("poll"); }],
+    [tr("Настройки папки…"), () => folderSettings(f)],
+    [tr("Пересканировать"), async () => { await api(`/folders/${f.id}/scan`, { method: "POST" }); emit("poll"); }],
   ]);
 });
 $("#addFolder").onclick = () => folderDialog();
@@ -700,13 +701,13 @@ export async function loadSaved() {
   const list = await api("/saved");
   state.saved = list;
   $("#savedlist").innerHTML = list.map((s) => `<li data-id="${s.id}"><span class="name">☆ ${esc(s.name)}</span></li>`).join("")
-    || `<li class="empty">Кнопка ☆ над сеткой сохранит поиск</li>`;
+    || `<li class="empty">${tr("Кнопка ☆ над сеткой сохранит поиск")}</li>`;
   $$("#savedlist li[data-id]").forEach((li) => {
     const s = list.find((x) => x.id === +li.dataset.id);
     li.onclick = () => { emit("navigate", "library"); applyQuery(s.query); };
     li.oncontextmenu = (e) => {
       e.preventDefault();
-      menu(e, [["Удалить поиск", async () => { await api(`/saved/${s.id}`, { method: "DELETE" }); loadSaved(); }]]);
+      menu(e, [[tr("Удалить поиск"), async () => { await api(`/saved/${s.id}`, { method: "DELETE" }); loadSaved(); }]]);
     };
   });
 }
@@ -734,8 +735,8 @@ function syncControls() {
 $("#saveSearch").onclick = () => {
   const auto = [state.q, ...state.tags.map((t) => "#" + t), ...state.ntags.map((t) => "-#" + t)].filter(Boolean).join(" ")
     || $(`#views [data-view="${state.view}"]`).textContent.trim();
-  promptDialog("Сохранить поиск", "Он появится в боковой панели — один клик, и подборка снова перед вами.", auto,
-    async (name) => { await api("/saved", { method: "POST", body: { name, query: currentQuery() } }); loadSaved(); toast("Поиск сохранён"); });
+  promptDialog(tr("Сохранить поиск"), tr("Он появится в боковой панели — один клик, и подборка снова перед вами."), auto,
+    async (name) => { await api("/saved", { method: "POST", body: { name, query: currentQuery() } }); loadSaved(); toast(tr("Поиск сохранён")); });
 };
 
 // ---------- чипы фильтров
@@ -748,7 +749,7 @@ function renderChips() {
     const f = state.folders.find((x) => x.id === state.folder);
     if (f) chips.push(`<span class="chip">📁 ${esc(f.path.split(/[\\/]/).pop())}<button data-rm-folder>×</button></span>`);
   }
-  if (chips.length > 1) chips.push(`<button class="mini ghost" data-rm-all>Сбросить всё</button>`);
+  if (chips.length > 1) chips.push(`<button class="mini ghost" data-rm-all>${tr("Сбросить всё")}</button>`);
   const html = chips.join("");
   if ($("#chips").innerHTML !== html) $("#chips").innerHTML = html;
 }
@@ -797,14 +798,14 @@ function kindOptions(sel) {
 
 export function folderDialog(onDone = null) {
   const native = !!window.pywebview?.api?.pick_folder;
-  modal(`<h2>Добавить папку</h2>
-    <p>Refis не копирует и не перемещает файлы, а только запоминает, где они лежат, и строит каталог с превью.</p>
-    <div class="field"><label>Папка</label>
-      <div class="row" style="flex-wrap:nowrap"><input type="text" id="fPath" placeholder="D:\\Арт\\Референсы">
-      ${native ? '<button id="fPick">Обзор…</button>' : ""}</div></div>
-    <div class="field"><label>Что в ней по умолчанию</label><select id="fKind">${kindOptions("ref")}</select></div>
-    <label class="check"><input type="checkbox" id="fAuto" checked><span>Сделать теги из названий подпапок<br><small class="muted">«Руки\\Мужские» → теги «руки» и «мужские»</small></span></label>
-    <div class="actions"><button data-close>Отмена</button><button class="primary" id="fOk">Добавить</button></div>`,
+  modal(`<h2>${tr("Добавить папку")}</h2>
+    <p>${tr("Refis не копирует и не перемещает файлы, а только запоминает, где они лежат, и строит каталог с превью.")}</p>
+    <div class="field"><label>${tr("Папка")}</label>
+      <div class="row" style="flex-wrap:nowrap"><input type="text" id="fPath" placeholder="${tr("D:\\Арт\\Референсы")}">
+      ${native ? tr('<button id="fPick">Обзор…</button>') : ""}</div></div>
+    <div class="field"><label>${tr("Что в ней по умолчанию")}</label><select id="fKind">${kindOptions("ref")}</select></div>
+    <label class="check"><input type="checkbox" id="fAuto" checked><span>${tr("Сделать теги из названий подпапок")}<br><small class="muted">${tr("«Руки\\Мужские» → теги «руки» и «мужские»")}</small></span></label>
+    <div class="actions"><button data-close>${tr("Отмена")}</button><button class="primary" id="fOk">${tr("Добавить")}</button></div>`,
     (box, close) => {
       if (native) $("#fPick", box).onclick = async () => {
         const p = await window.pywebview.api.pick_folder();
@@ -815,7 +816,7 @@ export function folderDialog(onDone = null) {
         if (!path) return;
         await api("/folders", { method: "POST", body: { path, kind: $("#fKind", box).value, auto_tags: $("#fAuto", box).checked } });
         close();
-        toast("Папка добавлена — сканирую…");
+        toast(tr("Папка добавлена — сканирую…"));
         await loadFolders();
         if (onDone) onDone(); else emit("navigate", "library");
         emit("poll");
@@ -824,13 +825,13 @@ export function folderDialog(onDone = null) {
 }
 
 function folderSettings(f) {
-  modal(`<h2>Папка</h2><p style="word-break:break-all">${esc(f.path)}</p>
-    <div class="field"><label>Тип по умолчанию</label><select id="sKind">${kindOptions(f.kind)}</select></div>
-    <label class="check"><input type="checkbox" id="sApply"> Применить этот тип ко всем ${files(f.count)} папки</label>
-    <label class="check"><input type="checkbox" id="sAuto"${f.auto_tags ? " checked" : ""}> Теги из названий подпапок для новых файлов</label>
+  modal(`<h2>${tr("Папка")}</h2><p style="word-break:break-all">${esc(f.path)}</p>
+    <div class="field"><label>${tr("Тип по умолчанию")}</label><select id="sKind">${kindOptions(f.kind)}</select></div>
+    <label class="check"><input type="checkbox" id="sApply"> ${tr("Применить этот тип ко всем")} ${files(f.count)} ${tr("папки")}</label>
+    <label class="check"><input type="checkbox" id="sAuto"${f.auto_tags ? " checked" : ""}> ${tr("Теги из названий подпапок для новых файлов")}</label>
     <div class="actions" style="justify-content:space-between">
-      <button class="danger" id="sDel">Убрать из Refis</button>
-      <span class="row"><button data-close>Отмена</button><button class="primary" id="sOk">Сохранить</button></span>
+      <button class="danger" id="sDel">${tr("Убрать из")} Refis</button>
+      <span class="row"><button data-close>${tr("Отмена")}</button><button class="primary" id="sOk">${tr("Сохранить")}</button></span>
     </div>`,
     (box, close) => {
       $("#sOk", box).onclick = async () => {
@@ -838,26 +839,26 @@ function folderSettings(f) {
           kind: $("#sKind", box).value, apply_kind: $("#sApply", box).checked, auto_tags: $("#sAuto", box).checked } });
         close(); await loadFolders(); load();
       };
-      $("#sDel", box).onclick = () => confirmDialog("Убрать папку из Refis?",
-        "Теги, оценки и заметки файлов этой папки будут удалены из каталога. Сами файлы на диске НЕ удаляются.",
-        async () => { await api(`/folders/${f.id}`, { method: "DELETE" }); state.folder = 0; await Promise.all([loadFolders(), loadTags()]); load(); }, "Убрать");
+      $("#sDel", box).onclick = () => confirmDialog(tr("Убрать папку из Refis?"),
+        tr("Теги, оценки и заметки файлов этой папки будут удалены из каталога. Сами файлы на диске НЕ удаляются."),
+        async () => { await api(`/folders/${f.id}`, { method: "DELETE" }); state.folder = 0; await Promise.all([loadFolders(), loadTags()]); load(); }, tr("Убрать"));
     });
 }
 
 export function uploadDialog(list) {
-  if (!state.folders.length) return toast("Сначала добавьте папку библиотеки", { action: "Добавить", onAction: folderDialog });
+  if (!state.folders.length) return toast(tr("Сначала добавьте папку библиотеки"), { action: tr("Добавить"), onAction: folderDialog });
   const last = store("upload") || {};
   const fid = state.folder || last.folder || state.folders[0].id;
   const previews = list.filter((f) => f.type.startsWith("image/")).slice(0, 6).map((f) => URL.createObjectURL(f));
-  modal(`<h2>Добавить ${files(list.length)}</h2>
+  modal(`<h2>${tr("Добавить")} ${files(list.length)}</h2>
     ${previews.length ? `<div class="row">${previews.map((u) => `<img src="${u}" style="width:64px;height:64px;object-fit:cover;border-radius:8px">`).join("")}</div>` : ""}
-    <div class="field"><label>Папка библиотеки</label>
+    <div class="field"><label>${tr("Папка библиотеки")}</label>
       <select id="uFolder">${state.folders.map((f) => `<option value="${f.id}"${f.id === fid ? " selected" : ""}>${esc(f.path)}</option>`).join("")}</select></div>
-    <div class="field"><label>Подпапка</label><input type="text" id="uSub" value="${esc(last.sub ?? "_Входящие")}"></div>
-    <div class="field"><label>Тип</label><select id="uKind"><option value="">как у папки</option>${kindOptions("")}</select></div>
-    <div class="field"><label>Теги через запятую</label><input type="text" id="uTags" list="tagOptions" placeholder="анатомия, руки"></div>
-    <div class="field"><label>Источник</label><input type="text" id="uSrc" placeholder="необязательно"></div>
-    <div class="actions"><button data-close>Отмена</button><button class="primary" id="uOk">Добавить</button></div>`,
+    <div class="field"><label>${tr("Подпапка")}</label><input type="text" id="uSub" value="${esc(last.sub ?? tr("_Входящие"))}"></div>
+    <div class="field"><label>${tr("Тип")}</label><select id="uKind"><option value="">${tr("как у папки")}</option>${kindOptions("")}</select></div>
+    <div class="field"><label>${tr("Теги через запятую")}</label><input type="text" id="uTags" list="tagOptions" placeholder="${tr("анатомия, руки")}"></div>
+    <div class="field"><label>${tr("Источник")}</label><input type="text" id="uSrc" placeholder="${tr("необязательно")}"></div>
+    <div class="actions"><button data-close>${tr("Отмена")}</button><button class="primary" id="uOk">${tr("Добавить")}</button></div>`,
     (box, close) => {
       setTimeout(() => $("#uTags", box).focus(), 40);
       $("#uTags", box).onkeydown = (e) => { if (e.key === "Enter") $("#uOk", box).click(); };
@@ -871,13 +872,13 @@ export function uploadDialog(list) {
         fd.append("kind", $("#uKind", box).value);
         store("upload", { folder, sub });
         $("#uOk", box).disabled = true;
-        $("#uOk", box).textContent = "Копирую…";
+        $("#uOk", box).textContent = tr("Копирую…");
         const res = await api("/upload", { method: "POST", body: fd });
         const src = $("#uSrc", box).value.trim();
         if (src) await Promise.all(res.added.map((id) => api(`/media/${id}`, { method: "PATCH", body: { source: src } })));
         close();
         previews.forEach(URL.revokeObjectURL);
-        toast(`Добавлено: ${files(res.added.length)}`);
+        toast(`${tr("Добавлено")}: ${files(res.added.length)}`);
         emit("navigate", "library");
         setView("all"); state.sort = "new"; syncControls();
         await Promise.all([loadFolders(), loadTags()]);
@@ -903,10 +904,10 @@ export function libraryKey(e) {
   if (k === "Escape" && ids.length) { select([]); return true; }
   if ((k === " " || k === "Enter") && ids.length) { view(ids[0]); return true; }
   if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(k)) { arrowNav(k, e.shiftKey); return true; }
-  if (ids.length && /^[0-5]$/.test(k)) { bulk({ ids, rating: +k }); toast(+k ? `Оценка ${"★".repeat(+k)}` : "Оценка сброшена"); return true; }
+  if (ids.length && /^[0-5]$/.test(k)) { bulk({ ids, rating: +k }); toast(+k ? `${tr("Оценка")} ${"★".repeat(+k)}` : tr("Оценка сброшена")); return true; }
   if (ids.length && (k === "f" || k === "а")) {
     const fav = !state.items.filter((i) => state.selected.has(i.id)).every((i) => i.favorite);
-    bulk({ ids, favorite: fav }); toast(fav ? "♥ В избранном" : "Убрано из избранного"); return true;
+    bulk({ ids, favorite: fav }); toast(fav ? tr("♥ В избранном") : tr("Убрано из избранного")); return true;
   }
   if (ids.length && (k === "t" || k === "е")) {
     if (document.body.classList.contains("details-hidden")) toggleDetails();

@@ -17,6 +17,7 @@ from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from .i18n import tr
 from . import db, media
 
 router = APIRouter(prefix="/api")
@@ -252,24 +253,24 @@ def suggest_for(mid: int):
             "SELECT t.name, COUNT(*) n FROM media x JOIN media_tags mt ON mt.media_id = x.id JOIN tags t ON t.id = mt.tag_id"
             " WHERE substr(x.path, 1, ?) = ? AND instr(substr(x.path, ?), ?) = 0 AND x.id != ? GROUP BY t.id",
             (len(prefix), prefix, len(prefix) + 1, os.sep, mid)):
-        score[r["name"]] += 3 + r["n"]; why.setdefault(r["name"], "в этой папке")
+        score[r["name"]] += 3 + r["n"]; why.setdefault(r["name"], tr("в этой папке"))
     all_tags = [r["name"] for r in conn.execute("SELECT name FROM tags")]
     toks = set(tokens(m["name"])) | {db.normalize_tag(p) for p in Path(folder).parts[-2:]}
     for t in all_tags:
         last = t.split("/")[-1]
         if last in toks or any(len(k) > 3 and (k.startswith(last) or last.startswith(k)) for k in toks):
-            score[t] += 6; why[t] = "по имени файла"
+            score[t] += 6; why[t] = tr("по имени файла")
     if m["qhash"]:
         for r in conn.execute(
                 "SELECT t.name FROM media x JOIN media_tags mt ON mt.media_id = x.id JOIN tags t ON t.id = mt.tag_id"
                 " WHERE x.qhash = ? AND x.id != ?", (m["qhash"], mid)):
-            score[r["name"]] += 8; why[r["name"]] = "у дубликата"
+            score[r["name"]] += 8; why[r["name"]] = tr("у дубликата")
     for r in conn.execute("SELECT t.name, COUNT(*) n FROM tags t JOIN media_tags mt ON mt.tag_id = t.id"
                           " GROUP BY t.id ORDER BY n DESC LIMIT 12"):
-        score[r["name"]] += 1 + math.log(r["n"]); why.setdefault(r["name"], "популярный")
+        score[r["name"]] += 1 + math.log(r["n"]); why.setdefault(r["name"], tr("популярный"))
     new_words = [t for t in tokens(m["name"]) if t not in all_tags][:3]
     out = [{"tag": t, "why": why[t]} for t, _ in score.most_common(12)]
-    out += [{"tag": t, "why": "новый, из имени"} for t in new_words]
+    out += [{"tag": t, "why": tr("новый, из имени")} for t in new_words]
     return out
 
 
@@ -338,11 +339,11 @@ def today(n: int = 0):
     topic = pick_topic(rnd, topics)
     if topic:
         imgs = pick_images(rnd, conn, tag=topic["tag"], kind="ref") or pick_images(rnd, conn, tag=topic["tag"])
-        reason = (f"Тема дня — #{topic['tag']}: по ней вы давно не практиковались" if not topic["practiced"]
-                  else f"Тема дня — #{topic['tag']}")
+        reason = (tr("Тема дня — #{tag}: по ней вы давно не практиковались", tag=topic["tag"]) if not topic["practiced"]
+                  else tr("Тема дня — #{tag}", tag=topic["tag"]))
     else:
         imgs = pick_images(rnd, conn, kind="ref") or pick_images(rnd, conn)
-        reason = "Пока случайно: разметьте файлы тегами, и подбор станет точнее"
+        reason = tr("Пока случайно: разметьте файлы тегами, и подбор станет точнее")
     if not imgs:
         return {"media": None}
     from .server import get_media
@@ -381,40 +382,40 @@ def challenge(n: int = 0):
     if new_pins:
         options.append(("pin", 1.5))
     if not options:
-        return {"ctype": "none", "reason": "Добавьте теги к файлам — задания строятся из ваших тем и референсов."}
+        return {"ctype": "none", "reason": tr("Добавьте теги к файлам — задания строятся из ваших тем и референсов.")}
     ctype = _weighted(rnd, [o[0] for o in options], [o[1] for o in options])
-    rule = rnd.choice(RULES)
+    rule = tr(rnd.choice(RULES))
     if ctype == "series":
         t = pick_topic(rnd, big)
         imgs = pick_images(rnd, conn, tag=t["tag"], k=10)
         per = rnd.choice([45, 60, 90, 120])
-        return {"ctype": ctype, "tag": t["tag"], "title": f"Серия набросков: #{t['tag']}",
-                "text": f"{len(imgs)} референсов из темы «{t['tag']}» по {per} секунд — разогрев руки и глаза.",
-                "rule": "не детализируй, лови движение и пропорции", "minutes": round(len(imgs) * per / 60),
+        return {"ctype": ctype, "tag": t["tag"], "title": tr("Серия набросков: #{tag}", tag=t["tag"]),
+                "text": tr("{n} референсов из темы «{tag}» по {per} секунд — разогрев руки и глаза.", n=len(imgs), tag=t["tag"], per=per),
+                "rule": tr("не детализируй, лови движение и пропорции"), "minutes": round(len(imgs) * per / 60),
                 "per": per, "images": [{"id": i["id"]} for i in imgs]}
     if ctype == "study":
         imgs = pick_images(rnd, conn, where=" AND (m.favorite = 1 OR m.rating >= 4)")
-        return {"ctype": ctype, "tag": "", "title": "Мастер-штудия",
-                "text": f"Скопируй как можно точнее свой любимый референс «{imgs[0]['name']}».",
-                "rule": "сначала пропорции и большие тени, детали — в конце", "minutes": rnd.choice([30, 45, 60]),
+        return {"ctype": ctype, "tag": "", "title": tr("Мастер-штудия"),
+                "text": tr("Скопируй как можно точнее свой любимый референс «{name}».", name=imgs[0]["name"]),
+                "rule": tr("сначала пропорции и большие тени, детали — в конце"), "minutes": rnd.choice([30, 45, 60]),
                 "images": [{"id": imgs[0]["id"]}]}
     if ctype == "redraw":
         imgs = pick_images(rnd, conn, kind="own", where=f" AND m.mtime < {time.time() - 60 * DAY}")
         age = (time.time() - imgs[0]["mtime"]) / DAY
-        when = f"{round(age / 30)} мес. назад" if age < 365 else f"{age / 365:.1f} г. назад"
-        return {"ctype": ctype, "tag": "", "title": "Перерисуй свою работу",
-                "text": f"«{imgs[0]['name']}» — нарисована {when}. Нарисуй заново и сравни, как ты вырос(ла).",
-                "rule": "не копируй старую — нарисуй с нуля, глядя на неё", "minutes": rnd.choice([30, 45, 60]),
+        when = tr("{n} мес. назад", n=round(age / 30)) if age < 365 else tr("{n} г. назад", n=f"{age / 365:.1f}")
+        return {"ctype": ctype, "tag": "", "title": tr("Перерисуй свою работу"),
+                "text": tr("«{name}» — нарисована {when}. Нарисуй заново и сравни, как ты вырос(ла).", name=imgs[0]["name"], when=when),
+                "rule": tr("не копируй старую — нарисуй с нуля, глядя на неё"), "minutes": rnd.choice([30, 45, 60]),
                 "images": [{"id": imgs[0]["id"]}]}
     if ctype == "pin":
         p = conn.execute("SELECT p.id, p.title, s.title board FROM pins p JOIN pin_sources s ON s.id = p.source_id"
                          " WHERE p.status = 'new' ORDER BY random() LIMIT 1").fetchone()
-        return {"ctype": ctype, "tag": "", "title": "Свежий пин",
-                "text": f"Новый референс с доски «{p['board']}»" + (f": {p['title']}" if p["title"] else "") + ".",
+        return {"ctype": ctype, "tag": "", "title": tr("Свежий пин"),
+                "text": tr("Новый референс с доски «{board}»", board=p["board"]) + (f": {p['title']}" if p["title"] else "") + ".",
                 "rule": rule, "minutes": rnd.choice([10, 15, 20]), "images": [{"pin": p["id"]}]}
     t = pick_topic(rnd, topics)
     imgs = pick_images(rnd, conn, tag=t["tag"])
-    return {"ctype": "tag", "tag": t["tag"], "title": f"Нарисуй: #{t['tag']}",
-            "text": (f"Тема из вашей библиотеки ({t['count']} референсов)"
-                     + ("; давно не практиковались" if not t["practiced"] else "") + "."),
+    return {"ctype": "tag", "tag": t["tag"], "title": tr("Нарисуй: #{tag}", tag=t["tag"]),
+            "text": (tr("Тема из вашей библиотеки ({n} референсов)", n=t["count"])
+                     + (tr("; давно не практиковались") if not t["practiced"] else "") + "."),
             "rule": rule, "minutes": rnd.choice([10, 15, 20, 30]), "images": [{"id": i["id"]} for i in imgs]}

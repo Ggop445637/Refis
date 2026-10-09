@@ -1,7 +1,8 @@
 // Общие помощники: DOM, API, уведомления, диалоги, меню, буфер обмена.
+import { tr, plural } from "./i18n.js";
 
-export const KINDS = { ref: "Референс", own: "Моя работа", tutorial: "Туториал", other: "Прочее" };
-export const KIND_PLURAL = { ref: "Референсы", own: "Мои работы", tutorial: "Туториалы", other: "Прочее" };
+export const KINDS = { ref: tr("Референс"), own: tr("Моя работа"), tutorial: tr("Туториал"), other: tr("Прочее") };
+export const KIND_PLURAL = { ref: tr("Референсы"), own: tr("Мои работы"), tutorial: tr("Туториалы"), other: tr("Прочее") };
 
 export const $ = (s, el = document) => el.querySelector(s);
 export const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -43,7 +44,7 @@ export async function api(path, opts = {}, retry = true) {
   if (!r.ok) {
     let msg = r.statusText;
     try { msg = (await r.json()).detail || msg; } catch {}
-    toast(typeof msg === "string" ? msg : "Ошибка запроса", { error: true });
+    toast(typeof msg === "string" ? msg : tr("Ошибка запроса"), { error: true });
     throw new Error(msg);
   }
   return r.json();
@@ -61,16 +62,11 @@ export function fmtDur(s) {
   return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(sec).padStart(2, "0");
 }
 export function fmtSize(b) {
-  if (b > 1 << 30) return (b / (1 << 30)).toFixed(1) + " ГБ";
-  if (b > 1 << 20) return (b / (1 << 20)).toFixed(1) + " МБ";
-  return Math.max(1, Math.round(b / 1024)) + " КБ";
+  if (b > 1 << 30) return (b / (1 << 30)).toFixed(1) + tr(" ГБ");
+  if (b > 1 << 20) return (b / (1 << 20)).toFixed(1) + tr(" МБ");
+  return Math.max(1, Math.round(b / 1024)) + tr(" КБ");
 }
-export function plural(n, one, few, many) {
-  const m10 = n % 10, m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return one;
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
-  return many;
-}
+export { plural };
 export const files = (n) => `${n} ${plural(n, "файл", "файла", "файлов")}`;
 
 // ------------------------------------------------------------ уведомления
@@ -121,15 +117,15 @@ export function modal(html, onReady) {
 export const closeModal = () => $("#modal")._close?.();
 export const modalOpen = () => !$("#modal").hidden && !$("#modal").classList.contains("closing");
 
-export function confirmDialog(title, text, onOk, okLabel = "Да") {
+export function confirmDialog(title, text, onOk, okLabel = tr("Да")) {
   modal(`<h2>${esc(title)}</h2><p>${esc(text)}</p>
-    <div class="actions"><button data-close>Отмена</button><button class="primary" id="mOk">${esc(okLabel)}</button></div>`,
+    <div class="actions"><button data-close>${tr("Отмена")}</button><button class="primary" id="mOk">${esc(okLabel)}</button></div>`,
     (box, close) => { $("#mOk", box).onclick = async () => { close(); await onOk(); }; setTimeout(() => $("#mOk", box).focus(), 40); });
 }
 
 export function promptDialog(title, text, value, onOk) {
   modal(`<h2>${esc(title)}</h2>${text ? `<p>${esc(text)}</p>` : ""}<input type="text" id="mVal" value="${esc(value)}">
-    <div class="actions"><button data-close>Отмена</button><button class="primary" id="mOk">Готово</button></div>`,
+    <div class="actions"><button data-close>${tr("Отмена")}</button><button class="primary" id="mOk">${tr("Готово")}</button></div>`,
     (box, close) => {
       const ok = async () => { const v = $("#mVal", box).value.trim(); if (!v) return; close(); await onOk(v); };
       $("#mOk", box).onclick = ok;
@@ -227,16 +223,16 @@ export async function copyImage(src) {
     c.getContext("2d").drawImage(bmp, 0, 0);
     const png = await new Promise((r) => c.toBlob(r, "image/png"));
     await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
-    toast("Картинка скопирована — вставьте её в редактор (Ctrl+V)");
+    toast(tr("Картинка скопирована — вставьте её в редактор (Ctrl+V)"));
   } catch (e) {
-    toast("Не удалось скопировать картинку", { error: true });
+    toast(tr("Не удалось скопировать картинку"), { error: true });
   }
 }
 
 export async function copyText(text, swatch) {
   try {
     await navigator.clipboard.writeText(text);
-    toast(`Скопировано: ${text}`, { swatch });
+    toast(`${tr("Скопировано")}: ${text}`, { swatch });
   } catch {
     toast(text, { swatch });
   }
@@ -250,7 +246,7 @@ export function clipboardImages(e) {
       const f = i.getAsFile();
       const ext = (f.type.split("/")[1] || "png").replace("jpeg", "jpg");
       const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-      return new File([f], f.name && f.name !== "image.png" ? f.name : `вставка-${stamp}.${ext}`, { type: f.type });
+      return new File([f], f.name && f.name !== "image.png" ? f.name : `${tr("вставка")}-${stamp}.${ext}`, { type: f.type });
     });
 }
 

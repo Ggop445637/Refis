@@ -18,7 +18,8 @@ from urllib.parse import quote
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from . import GITHUB_REPO, TELEGRAM_URL, __version__, db
+from . import GITHUB_REPO, TELEGRAM_URL, __version__, db, i18n
+from .i18n import tr
 from .net import http_get
 
 log = logging.getLogger("refis")
@@ -59,11 +60,12 @@ def set_many(values: dict) -> dict:
     conn = db.connect()
     for k, v in values.items():
         if k not in DEFAULTS:
-            raise HTTPException(400, f"Неизвестная настройка: {k}")
+            raise HTTPException(400, tr("Неизвестная настройка: {k}", k=k))
         if type(v) is not type(DEFAULTS[k]):
-            raise HTTPException(400, f"Неверное значение для {k}")
+            raise HTTPException(400, tr("Неверное значение для {k}", k=k))
         conn.execute("INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                      (k, json.dumps(v)))
+    i18n.reset()
     return get_all()
 
 
@@ -96,7 +98,7 @@ class UrlIn(BaseModel):
 def open_url(u: UrlIn):
     """Открывает ссылку в браузере по умолчанию (из окна приложения window.open не всегда срабатывает)."""
     if not re.match(r"https?://", u.url):
-        raise HTTPException(400, "Можно открывать только веб-ссылки")
+        raise HTTPException(400, tr("Можно открывать только веб-ссылки"))
     webbrowser.open(u.url)
     return {"ok": True}
 
@@ -244,13 +246,13 @@ def _validate_backup(zpath: Path) -> None:
     with zipfile.ZipFile(zpath) as z:
         names = z.namelist()
         if "refis.db" not in names:
-            raise HTTPException(400, "Это не резервная копия Refis (нет refis.db)")
+            raise HTTPException(400, tr("Это не резервная копия Refis (нет refis.db)"))
         with z.open("refis.db") as f:
             if f.read(16) != b"SQLite format 3\x00":
-                raise HTTPException(400, "Файл базы в копии повреждён")
+                raise HTTPException(400, tr("Файл базы в копии повреждён"))
         for n in names:
             if n.startswith("/") or ".." in Path(n).parts:
-                raise HTTPException(400, "Недопустимые пути в архиве")
+                raise HTTPException(400, tr("Недопустимые пути в архиве"))
 
 
 def _stage_restore(zpath: Path) -> None:
@@ -271,7 +273,7 @@ def restore(file: UploadFile = File(...)):
     try:
         _stage_restore(tmp)
     except zipfile.BadZipFile:
-        raise HTTPException(400, "Файл не является zip-архивом")
+        raise HTTPException(400, tr("Файл не является zip-архивом"))
     finally:
         tmp.unlink(missing_ok=True)
     return {"restart": True}

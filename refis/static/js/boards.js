@@ -1,4 +1,5 @@
 // Доски референсов (как PureRef): бесконечный холст, картинки, видео, заметки.
+import { tr, loc } from "./i18n.js";
 import {
   $, $$, api, esc, toast, menu, modal, confirmDialog, promptDialog, emit, on, isTyping,
   fileUrl, thumbUrl, copyImage, clipboardImages, reduced, plural,
@@ -17,13 +18,13 @@ let saveTimer = null;
 export async function renderBoards() {
   const root = $("#boards");
   const list = await api("/boards");
-  root.innerHTML = `<header class="rise"><h1>Доски</h1><button class="primary" id="bNew">＋ Новая доска</button></header>
+  root.innerHTML = `<header class="rise"><h1>${tr("Доски")}</h1><button class="primary" id="bNew">＋ ${tr("Новая доска")}</button></header>
     <div class="bgrid">
       ${list.map((b, i) => `<div class="glass bcard" style="--i:${i}" data-id="${b.id}">
-        <div class="prev n${Math.min(b.preview.length, 3)}">${b.preview.length ? b.preview.slice(0, 3).map((s) => `<img src="${esc(previewSrc(s))}" alt="" loading="lazy">`).join("") : '<div class="none">пусто</div>'}</div>
-        <div class="info"><b>${esc(b.name)}</b><small>${b.count} ${plural(b.count, "элемент", "элемента", "элементов")} · ${new Date(b.updated_at * 1000).toLocaleDateString("ru-RU")}</small></div>
+        <div class="prev n${Math.min(b.preview.length, 3)}">${b.preview.length ? b.preview.slice(0, 3).map((s) => `<img src="${esc(previewSrc(s))}" alt="" loading="lazy">`).join("") : tr('<div class="none">пусто</div>')}</div>
+        <div class="info"><b>${esc(b.name)}</b><small>${b.count} ${plural(b.count, "элемент", "элемента", "элементов")} · ${new Date(b.updated_at * 1000).toLocaleDateString(loc())}</small></div>
       </div>`).join("")}
-      <div class="glass bcard new" style="--i:${list.length}" id="bNew2"><div><span class="plus">＋</span>Новая доска</div></div>
+      <div class="glass bcard new" style="--i:${list.length}" id="bNew2"><div><span class="plus">＋</span>${tr("Новая доска")}</div></div>
     </div>`;
   $("#bNew").onclick = $("#bNew2").onclick = () => createBoard();
   $$(".bcard[data-id]", root).forEach((c) => {
@@ -32,15 +33,15 @@ export async function renderBoards() {
       e.preventDefault();
       const b = list.find((x) => x.id === +c.dataset.id);
       menu(e, [
-        ["Открыть", () => openBoard(b.id)],
-        ["Переименовать…", () => promptDialog("Название доски", "", b.name, async (name) => { await api(`/boards/${b.id}`, { method: "PUT", body: { name } }); renderBoards(); })],
-        ["Дублировать", async () => {
+        [tr("Открыть"), () => openBoard(b.id)],
+        [tr("Переименовать…"), () => promptDialog(tr("Название доски"), "", b.name, async (name) => { await api(`/boards/${b.id}`, { method: "PUT", body: { name } }); renderBoards(); })],
+        [tr("Дублировать"), async () => {
           const full = await api(`/boards/${b.id}`);
-          await api("/boards", { method: "POST", body: { name: b.name + " (копия)", data: full.data } });
+          await api("/boards", { method: "POST", body: { name: b.name + tr(" (копия)"), data: full.data } });
           renderBoards();
         }],
         "-",
-        ["Удалить…", () => confirmDialog("Удалить доску?", `«${b.name}» исчезнет. Картинки в библиотеке останутся.`, async () => { await api(`/boards/${b.id}`, { method: "DELETE" }); renderBoards(); }, "Удалить")],
+        [tr("Удалить…"), () => confirmDialog(tr("Удалить доску?"), `«${b.name}» ${tr("исчезнет. Картинки в библиотеке останутся.")}`, async () => { await api(`/boards/${b.id}`, { method: "DELETE" }); renderBoards(); }, tr("Удалить"))],
       ]);
     };
   });
@@ -49,7 +50,7 @@ export async function renderBoards() {
 const previewSrc = (s) => s.replace(/^\/api\/file\/(\d+)$/, "/api/thumb/$1");
 
 export async function createBoard(name) {
-  const n = name || `Доска ${new Date().toLocaleDateString("ru-RU")}`;
+  const n = name || `${tr("Доска")} ${new Date().toLocaleDateString(loc())}`;
   const { id } = await api("/boards", { method: "POST", body: { name: n } });
   openBoard(id);
   return id;
@@ -73,31 +74,31 @@ function buildEditor() {
   const page = $("#boardPage");
   page.innerHTML = `
     <div class="btop">
-      <button id="bBack" class="ghost">← Доски</button>
+      <button id="bBack" class="ghost">← ${tr("Доски")}</button>
       <input class="bname" id="bName" value="${esc(B.name)}">
       <span class="sp"></span>
-      <button id="bLib">＋ Из библиотеки</button>
-      <button id="bNoteBtn" title="Заметка (N)">✎ Заметка</button>
-      <button id="bArrange" title="Аккуратно разложить (A)">▦ Упорядочить</button>
-      <button id="bFitBtn" title="Показать всё (F)">⤢ Всё</button>
-      <button id="bPin" title="Окно поверх всех — удобно рисовать рядом">📌 Поверх окон</button>
-      <button id="bExport" title="Сохранить доску картинкой">⬇ PNG</button>
+      <button id="bLib">＋ ${tr("Из библиотеки")}</button>
+      <button id="bNoteBtn" title="${tr("Заметка (N)")}">✎ ${tr("Заметка")}</button>
+      <button id="bArrange" title="${tr("Аккуратно разложить (A)")}">▦ ${tr("Упорядочить")}</button>
+      <button id="bFitBtn" title="${tr("Показать всё (F)")}">⤢ ${tr("Всё")}</button>
+      <button id="bPin" title="${tr("Окно поверх всех — удобно рисовать рядом")}">📌 ${tr("Поверх окон")}</button>
+      <button id="bExport" title="${tr("Сохранить доску картинкой")}">⬇ PNG</button>
     </div>
     <div class="bwrap">
       <div class="bcanvas" id="bCanvas" tabindex="0">
         <div class="bworld" id="bWorld"></div>
-        <div class="bempty" id="bEmpty"><div><b>Пустая доска</b>Перетащите сюда картинки из библиотеки (＋ Из библиотеки),<br>файлы из проводника или вставьте из буфера — Ctrl+V</div></div>
+        <div class="bempty" id="bEmpty"><div><b>${tr("Пустая доска")}</b>${tr("Перетащите сюда картинки из библиотеки (＋ Из библиотеки)")},<br>${tr("файлы из проводника или вставьте из буфера")} — Ctrl+V</div></div>
         <div class="glass bzoom"><button class="ghost mini" id="bZo">−</button><span id="bZoom">100%</span><button class="ghost mini" id="bZi">＋</button></div>
-        <div class="glass bhelp">Колесо — зум · тянуть фон — двигать · Shift+тянуть — выделить<br>H зеркало · G ч/б · ] [ слои · Ctrl+D копия · Ctrl+Z отмена</div>
+        <div class="glass bhelp">${tr("Колесо — зум · тянуть фон — двигать · Shift+тянуть — выделить")}<br>${tr("H зеркало · G ч/б · ] [ слои · Ctrl+D копия · Ctrl+Z отмена")}</div>
       </div>
       <aside class="bdrawer" id="bDrawer"><div class="inner">
-        <input type="search" id="bSearch" placeholder="Поиск: слова, #тег">
-        <div class="hint">Перетащите картинку на доску или кликните, чтобы добавить</div>
+        <input type="search" id="bSearch" placeholder="${tr("Поиск: слова, #тег")}">
+        <div class="hint">${tr("Перетащите картинку на доску или кликните, чтобы добавить")}</div>
         <div class="dgrid" id="bDGrid"></div>
       </div></aside>
     </div>`;
   $("#bBack").onclick = () => { flushSave(); emit("navigate", "boards"); };
-  $("#bName").onchange = (e) => { B.name = e.target.value.trim() || "Доска"; api(`/boards/${B.id}`, { method: "PUT", body: { name: B.name } }); };
+  $("#bName").onchange = (e) => { B.name = e.target.value.trim() || tr("Доска"); api(`/boards/${B.id}`, { method: "PUT", body: { name: B.name } }); };
   $("#bName").onkeydown = (e) => { if (e.key === "Enter") e.target.blur(); };
   $("#bLib").onclick = toggleDrawer;
   $("#bNoteBtn").onclick = () => addNote();
@@ -257,7 +258,7 @@ function snapshot() {
   B.future = [];
 }
 function undo() {
-  if (!B.history.length) return toast("Отменять нечего", { life: 1200 });
+  if (!B.history.length) return toast(tr("Отменять нечего"), { life: 1200 });
   B.future.push(JSON.stringify(B.items));
   B.items = JSON.parse(B.history.pop());
   B.sel = new Set([...B.sel].filter((id) => B.items.some((i) => i.id === id)));
@@ -308,7 +309,7 @@ export function addMediaItems(list, at) {
 
 async function addFiles(fileList, at) {
   const imgs = fileList.filter((f) => f.type.startsWith("image/"));
-  if (!imgs.length) return toast("На доску можно добавить только картинки");
+  if (!imgs.length) return toast(tr("На доску можно добавить только картинки"));
   const pt = at || viewCenter();
   snapshot();
   const added = [];
@@ -324,7 +325,7 @@ async function addFiles(fileList, at) {
   }
   B.sel = new Set(added);
   render(); scheduleSave();
-  toast(`Добавлено на доску: ${added.length}`);
+  toast(`${tr("Добавлено на доску")}: ${added.length}`);
 }
 
 function addNote(at) {
@@ -381,7 +382,7 @@ function layer(dir) {
 /** Раскладывает картинки ровными рядами. */
 function arrange() {
   const list = (B.sel.size > 1 ? selected() : B.items).filter((i) => i.type !== "note");
-  if (list.length < 2) return toast("Нечего упорядочивать");
+  if (list.length < 2) return toast(tr("Нечего упорядочивать"));
   snapshot();
   const b = bounds(list);
   const H = Math.max(...list.map((i) => i.h)) * 0.8 || 300;
@@ -506,12 +507,12 @@ function bindCanvas() {
     const at = toWorld(e.clientX, e.clientY);
     if (!itemEl) {
       return menu(e, [
-        ["Заметка здесь", () => addNote(at), "N"],
-        ["Показать всё", () => fitAll(), "F"],
-        ["Упорядочить", arrange, "A"],
-        ["Масштаб 100%", () => { const r = c.getBoundingClientRect(); tweenView(zoomTarget(r.width / 2, r.height / 2, 1)); }, "0"],
+        [tr("Заметка здесь"), () => addNote(at), "N"],
+        [tr("Показать всё"), () => fitAll(), "F"],
+        [tr("Упорядочить"), arrange, "A"],
+        [tr("Масштаб 100%"), () => { const r = c.getBoundingClientRect(); tweenView(zoomTarget(r.width / 2, r.height / 2, 1)); }, "0"],
         "-",
-        ["Выделить всё", () => { B.sel = new Set(B.items.map((i) => i.id)); render(); }, "Ctrl A"],
+        [tr("Выделить всё"), () => { B.sel = new Set(B.items.map((i) => i.id)); render(); }, "Ctrl A"],
       ]);
     }
     const id = itemEl.dataset.id;
@@ -519,27 +520,27 @@ function bindCanvas() {
     const it = B.items.find((i) => i.id === id);
     const isImg = it.type !== "note" && it.mtype !== "video";
     menu(e, [
-      it.type === "note" && ["Редактировать", () => startEdit(id)],
-      it.type === "note" && ["Цвет: жёлтый", () => mutate((i) => (i.color = ""))],
-      it.type === "note" && ["Цвет: розовый", () => mutate((i) => (i.color = "pink"))],
-      it.type === "note" && ["Цвет: голубой", () => mutate((i) => (i.color = "blue"))],
-      it.type === "note" && ["Цвет: зелёный", () => mutate((i) => (i.color = "green"))],
-      it.type === "note" && ["Цвет: тёмный", () => mutate((i) => (i.color = "dark"))],
-      it.type !== "note" && ["Отразить", () => mutate((i) => (i.flip = !i.flip)), "H"],
-      it.type !== "note" && ["Чёрно-белое", () => mutate((i) => (i.gray = !i.gray)), "G"],
-      isImg && ["Копировать картинку", () => copyImage(it.src), "Ctrl C"],
-      it.type === "media" && ["Открыть в просмотре", () => openViewer({ items: [{ id: it.mid, type: it.mtype, name: "", tags: [] }] }, it.mid, itemEl)],
+      it.type === "note" && [tr("Редактировать"), () => startEdit(id)],
+      it.type === "note" && [tr("Цвет: жёлтый"), () => mutate((i) => (i.color = ""))],
+      it.type === "note" && [tr("Цвет: розовый"), () => mutate((i) => (i.color = "pink"))],
+      it.type === "note" && [tr("Цвет: голубой"), () => mutate((i) => (i.color = "blue"))],
+      it.type === "note" && [tr("Цвет: зелёный"), () => mutate((i) => (i.color = "green"))],
+      it.type === "note" && [tr("Цвет: тёмный"), () => mutate((i) => (i.color = "dark"))],
+      it.type !== "note" && [tr("Отразить"), () => mutate((i) => (i.flip = !i.flip)), "H"],
+      it.type !== "note" && [tr("Чёрно-белое"), () => mutate((i) => (i.gray = !i.gray)), "G"],
+      isImg && [tr("Копировать картинку"), () => copyImage(it.src), "Ctrl C"],
+      it.type === "media" && [tr("Открыть в просмотре"), () => openViewer({ items: [{ id: it.mid, type: it.mtype, name: "", tags: [] }] }, it.mid, itemEl)],
       "-",
-      ["На передний план", () => layer(1), "]"],
-      ["На задний план", () => layer(-1), "["],
-      ["Дублировать", duplicateSelected, "Ctrl D"],
-      ["Сбросить размер", () => mutate((i) => {
+      [tr("На передний план"), () => layer(1), "]"],
+      [tr("На задний план"), () => layer(-1), "["],
+      [tr("Дублировать"), duplicateSelected, "Ctrl D"],
+      [tr("Сбросить размер"), () => mutate((i) => {
         const el = $("img, video", B.els.get(i.id));
         const nw = el?.naturalWidth || el?.videoWidth, nh = el?.naturalHeight || el?.videoHeight;
         if (nw) { i.w = nw; i.h = nh; }
       })],
       "-",
-      ["Удалить", removeSelected, "Del"],
+      [tr("Удалить"), removeSelected, "Del"],
     ]);
   });
 
@@ -554,7 +555,7 @@ function bindCanvas() {
     const fl = [...e.dataTransfer.files];
     if (fl.length) return addFiles(fl, at);
     const url = e.dataTransfer.getData("text/uri-list");
-    if (url) toast("Картинку из браузера лучше скопировать (ПКМ → Копировать) и вставить Ctrl+V");
+    if (url) toast(tr("Картинку из браузера лучше скопировать (ПКМ → Копировать) и вставить Ctrl+V"));
   });
 }
 
@@ -585,7 +586,7 @@ async function loadDrawer() {
 
 async function exportPng() {
   const b = bounds();
-  if (!b) return toast("Доска пуста");
+  if (!b) return toast(tr("Доска пуста"));
   const pad = 40;
   const scale = Math.min(2, 8000 / (b.w + pad * 2), 8000 / (b.h + pad * 2));
   const c = document.createElement("canvas");
@@ -596,7 +597,7 @@ async function exportPng() {
   ctx.fillRect(0, 0, c.width, c.height);
   ctx.scale(scale, scale);
   ctx.translate(pad - b.x, pad - b.y);
-  toast("Собираю картинку…", { life: 1500 });
+  toast(tr("Собираю картинку…"), { life: 1500 });
   for (const it of [...B.items].sort((a, b2) => (a.z || 0) - (b2.z || 0))) {
     ctx.save();
     if (it.type === "note") {
@@ -620,7 +621,7 @@ async function exportPng() {
   const fd = new FormData();
   fd.append("file", blob, `${B.name}.png`);
   const res = await api(`/boards/${B.id}/export`, { method: "POST", body: fd });
-  toast(`Сохранено: ${res.path}`, { action: "Показать", life: 6000, onAction: () => api(`/boards/${B.id}/reveal-export?path=${encodeURIComponent(res.path)}`, { method: "POST" }) });
+  toast(`${tr("Сохранено")}: ${res.path}`, { action: tr("Показать"), life: 6000, onAction: () => api(`/boards/${B.id}/reveal-export?path=${encodeURIComponent(res.path)}`, { method: "POST" }) });
 }
 function wrapText(ctx, text, x, y, maxW, lh, maxY) {
   for (const para of text.split("\n")) {
@@ -689,12 +690,12 @@ export const leaveBoard = () => { flushSave(); };
 
 export async function addToBoardDialog(ids) {
   const list = await api("/boards");
-  modal(`<h2>Добавить на доску</h2>
+  modal(`<h2>${tr("Добавить на доску")}</h2>
     <p>${ids.length} ${plural(ids.length, "файл", "файла", "файлов")}</p>
-    <div class="field"><label>Доска</label>
-      <div class="opts" id="abList">${list.map((b) => `<button data-id="${b.id}">${esc(b.name)}</button>`).join("") || '<span class="hint">досок пока нет</span>'}</div></div>
-    <div class="field"><label>или новая</label><input type="text" id="abNew" placeholder="Название новой доски"></div>
-    <div class="actions"><button data-close>Отмена</button><button class="primary" id="abOk">Добавить</button></div>`,
+    <div class="field"><label>${tr("Доска")}</label>
+      <div class="opts" id="abList">${list.map((b) => `<button data-id="${b.id}">${esc(b.name)}</button>`).join("") || tr('<span class="hint">досок пока нет</span>')}</div></div>
+    <div class="field"><label>${tr("или новая")}</label><input type="text" id="abNew" placeholder="${tr("Название новой доски")}"></div>
+    <div class="actions"><button data-close>${tr("Отмена")}</button><button class="primary" id="abOk">${tr("Добавить")}</button></div>`,
     (box, close) => {
       let chosen = list[0]?.id || null;
       const mark = () => $$("#abList button", box).forEach((b) => b.classList.toggle("on", +b.dataset.id === chosen && !$("#abNew", box).value.trim()));
@@ -704,7 +705,7 @@ export async function addToBoardDialog(ids) {
       $("#abOk", box).onclick = async () => {
         const newName = $("#abNew", box).value.trim();
         let bid = chosen;
-        if (newName || !bid) bid = (await api("/boards", { method: "POST", body: { name: newName || "Новая доска" } })).id;
+        if (newName || !bid) bid = (await api("/boards", { method: "POST", body: { name: newName || tr("Новая доска") } })).id;
         const board = await api(`/boards/${bid}`);
         const items = board.data.items || [];
         const metas = (await Promise.all(ids.slice(0, 200).map((id) => api(`/media/${id}`).catch(() => null)))).filter(Boolean);
@@ -720,7 +721,7 @@ export async function addToBoardDialog(ids) {
         await api(`/boards/${bid}`, { method: "PUT", body: { data: { ...board.data, items } } });
         close();
         if (B.id === bid && boardActive()) { B.items = items; render(); }
-        toast(`Добавлено на доску «${newName || list.find((l) => l.id === bid)?.name || "Новая доска"}»`, { action: "Открыть", life: 5000, onAction: () => openBoard(bid) });
+        toast(`${tr("Добавлено на доску")} «${newName || list.find((l) => l.id === bid)?.name || tr("Новая доска")}»`, { action: tr("Открыть"), life: 5000, onAction: () => openBoard(bid) });
       };
     });
 }

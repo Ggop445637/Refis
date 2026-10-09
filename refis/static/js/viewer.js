@@ -1,4 +1,5 @@
 // Полноэкранный просмотр: FLIP-анимация из карточки, зум, зеркало, сетка, пипетка, видео.
+import { tr } from "./i18n.js";
 import { $, $$, api, esc, store, toast, fmtDur, thumbUrl, fileUrl, copyImage, copyText, reduced } from "./util.js";
 import { addToBoardDialog } from "./boards.js";
 
@@ -107,8 +108,8 @@ function show(fromEl, dir) {
     media.onerror = () => {
       box.remove();
       stage.insertAdjacentHTML("beforeend", `<div class="empty-state" style="padding-top:20vh">
-        <div class="big">🎞️</div><h2>Этот формат не играет встроенный плеер</h2><p>Откройте видео в системном плеере.</p>
-        <button class="primary" id="vExt">Открыть в плеере</button></div>`);
+        <div class="big">🎞️</div><h2>${tr("Этот формат не играет встроенный плеер")}</h2><p>${tr("Откройте видео в системном плеере.")}</p>
+        <button class="primary" id="vExt">${tr("Открыть в плеере")}</button></div>`);
       $("#vExt").onclick = () => api(`/media/${it.id}/open`, { method: "POST" });
     };
     box.appendChild(media);
@@ -265,7 +266,7 @@ async function act(a) {
     case "loop": V.loop = !V.loop; if (v) v.loop = V.loop; break;
     case "back": if (v) { v.pause(); v.currentTime = Math.max(0, v.currentTime - 1 / 30); } break;
     case "fwd": if (v) { v.pause(); v.currentTime += 1 / 30; } break;
-    case "copy": if (it.type === "image") copyImage(fullSrc(it)); else toast("Копировать можно только картинки"); break;
+    case "copy": if (it.type === "image") copyImage(fullSrc(it)); else toast(tr("Копировать можно только картинки")); break;
     case "pick": {
       if (!("EyeDropper" in window)) return;
       try {
@@ -274,14 +275,14 @@ async function act(a) {
       } catch {}
       break;
     }
-    case "board": if (it.external) return toast("Сначала сохраните картинку в библиотеку"); addToBoardDialog([it.id]); break;
+    case "board": if (it.external) return toast(tr("Сначала сохраните картинку в библиотеку")); addToBoardDialog([it.id]); break;
     case "fav": {
       if (it.external) return;
       it.favorite = it.favorite ? 0 : 1;
       await api(`/media/${it.id}`, { method: "PATCH", body: { favorite: !!it.favorite } });
       $('[data-act="fav"]').textContent = it.favorite ? "♥" : "♡";
       V.src.onChange?.(it.id);
-      toast(it.favorite ? "♥ В избранном" : "Убрано из избранного");
+      toast(it.favorite ? tr("♥ В избранном") : tr("Убрано из избранного"));
       break;
     }
   }
@@ -390,7 +391,7 @@ export function viewerKey(e) {
   if (v && ["[", "]", "х", "ъ"].includes(k)) {
     const sel = $("#vSpeed"), opts = [...sel.options].map((o) => o.value);
     const i = Math.max(0, Math.min(opts.length - 1, opts.indexOf(sel.value) + (k === "]" || k === "ъ" ? 1 : -1)));
-    sel.value = opts[i]; v.playbackRate = +opts[i]; toast(`Скорость ${opts[i]}×`, { life: 1200 });
+    sel.value = opts[i]; v.playbackRate = +opts[i]; toast(`${tr("Скорость")} ${opts[i]}×`, { life: 1200 });
     return true;
   }
   if (!v && k === " ") { step(1); return true; }
@@ -398,7 +399,7 @@ export function viewerKey(e) {
     const it = item();
     it.rating = +k;
     api(`/media/${it.id}`, { method: "PATCH", body: { rating: it.rating } }).then(() => V.src.onChange?.(it.id));
-    toast(`Оценка ${"★".repeat(it.rating)}`, { life: 1200 });
+    toast(`${tr("Оценка")} ${"★".repeat(it.rating)}`, { life: 1200 });
     return true;
   }
   const map = {

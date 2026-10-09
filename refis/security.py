@@ -15,6 +15,8 @@ from urllib.parse import urlsplit
 
 from starlette.responses import JSONResponse
 
+from .i18n import tr
+
 TOKEN = os.environ.get("REFIS_TOKEN") or secrets.token_urlsafe(32)
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "[::1]", "::1"}
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
@@ -34,13 +36,13 @@ def _forbidden(msg: str) -> JSONResponse:
 async def guard(request, call_next):
     host = _hostname(request.headers.get("host", ""))
     if host not in LOCAL_HOSTS:
-        return _forbidden("Доступ только с этого компьютера")
+        return _forbidden(tr("Доступ только с этого компьютера"))
     origin = request.headers.get("origin")
     if origin and _hostname(urlsplit(origin).netloc) not in LOCAL_HOSTS:
-        return _forbidden("Запрос с чужого сайта отклонён")
+        return _forbidden(tr("Запрос с чужого сайта отклонён"))
     if request.method not in SAFE_METHODS and request.url.path.startswith("/api/"):
         if not hmac.compare_digest(request.headers.get("x-refis-token", ""), TOKEN):
-            return _forbidden("Нет токена сессии — перезагрузите окно Refis")
+            return _forbidden(tr("Нет токена сессии — перезагрузите окно Refis"))
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "no-referrer")

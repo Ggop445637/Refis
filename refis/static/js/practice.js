@@ -1,4 +1,5 @@
 // Тренировка: сессии набросков с таймером, задания «Нарисуй это», журнал практики.
+import { tr } from "./i18n.js";
 import { $, $$, api, esc, store, toast, modal, fmtDur, fileUrl, confetti, emit, sleep, plural, reduced } from "./util.js";
 
 const RING = 2 * Math.PI * 26;
@@ -22,18 +23,18 @@ function srcOf(x) {
 export function practiceDialog({ ids = null, params = null, total = 0, single = false } = {}) {
   const last = store("practice") || { dur: 60, count: 20, shuffle: true };
   if (single) last.dur = Math.max(last.dur, 300);
-  const presets = [[30, "30 с"], [60, "1 мин"], [120, "2 мин"], [300, "5 мин"], [600, "10 мин"], [1200, "20 мин"], [0, "Без таймера"]];
-  const src = ids ? (single ? "один выбранный референс" : `выбранные файлы (${ids.length})`) : `текущая подборка (${total} ${plural(total, "файл", "файла", "файлов")}, видео пропускаются)`;
-  modal(`<h2>${single ? "Рисовать по референсу" : "Тренировка набросков"}</h2>
-    <p>Источник: ${esc(src)}.</p>
-    <div class="field"><label>Время на картинку</label>
+  const presets = [[30, tr("30 с")], [60, tr("1 мин")], [120, tr("2 мин")], [300, tr("5 мин")], [600, tr("10 мин")], [1200, tr("20 мин")], [0, tr("Без таймера")]];
+  const src = ids ? (single ? tr("один выбранный референс") : `${tr("выбранные файлы")} (${ids.length})`) : `${tr("текущая подборка")} (${total} ${plural(total, "файл", "файла", "файлов")}, ${tr("видео пропускаются)")}`;
+  modal(`<h2>${single ? tr("Рисовать по референсу") : tr("Тренировка набросков")}</h2>
+    <p>${tr("Источник")}: ${esc(src)}.</p>
+    <div class="field"><label>${tr("Время на картинку")}</label>
       <div class="opts">${presets.map(([s, l]) => `<button data-d="${s}" class="${s === last.dur ? "on" : ""}">${l}</button>`).join("")}</div>
-      <input type="number" id="pCustom" min="5" placeholder="или своё время в секундах" style="margin-top:6px"></div>
-    ${single ? "" : `<div class="field"><label>Сколько картинок</label><input type="number" id="pCount" min="1" value="${last.count}"></div>
-    <label class="check"><input type="checkbox" id="pShuffle"${last.shuffle ? " checked" : ""}> Перемешать</label>`}
-    <label class="check"><input type="checkbox" id="pMirror"> Отзеркалить</label>
-    <label class="check"><input type="checkbox" id="pGray"> Чёрно-белое</label>
-    <div class="actions"><button data-close>Отмена</button><button class="primary" id="pGo">Начать</button></div>`,
+      <input type="number" id="pCustom" min="5" placeholder="${tr("или своё время в секундах")}" style="margin-top:6px"></div>
+    ${single ? "" : `<div class="field"><label>${tr("Сколько картинок")}</label><input type="number" id="pCount" min="1" value="${last.count}"></div>
+    <label class="check"><input type="checkbox" id="pShuffle"${last.shuffle ? " checked" : ""}> ${tr("Перемешать")}</label>`}
+    <label class="check"><input type="checkbox" id="pMirror"> ${tr("Отзеркалить")}</label>
+    <label class="check"><input type="checkbox" id="pGray"> ${tr("Чёрно-белое")}</label>
+    <div class="actions"><button data-close>${tr("Отмена")}</button><button class="primary" id="pGo">${tr("Начать")}</button></div>`,
     (box, close) => {
       let dur = last.dur;
       $$("[data-d]", box).forEach((b) => (b.onclick = () => {
@@ -60,7 +61,7 @@ export function practiceDialog({ ids = null, params = null, total = 0, single = 
         }
         if (shuffle) list.sort(() => Math.random() - 0.5);
         list = list.slice(0, count);
-        if (!list.length) return toast("В подборке нет картинок");
+        if (!list.length) return toast(tr("В подборке нет картинок"));
         close();
         runSession({ ids: list, dur, mirror: $("#pMirror", box).checked, gray: $("#pGray", box).checked, kind: "gesture" });
       };
@@ -157,9 +158,9 @@ async function finish(early = false) {
   $("#pStage").className = "stage";
   $("#practice").classList.add("finished");
   $("#pStage").innerHTML = `<div class="pdone"><div class="big">${P.spent > 10 ? "🎉" : "👋"}</div>
-    <h2>${P.spent > 10 ? "Отличная работа!" : "Сессия завершена"}</h2>
-    <p>${P.kind === "challenge" ? "Задание выполнено" : `Набросков: ${count}`} · ${fmtDur(P.spent)} за листом${streak ? ` · серия: ${streak} ${plural(streak, "день", "дня", "дней")} 🔥` : ""}</p>
-    <button class="primary" id="pClose">Закрыть</button></div>`;
+    <h2>${P.spent > 10 ? tr("Отличная работа!") : tr("Сессия завершена")}</h2>
+    <p>${P.kind === "challenge" ? tr("Задание выполнено") : `${tr("Набросков")}: ${count}`} · ${fmtDur(P.spent)} ${tr("за листом")}${streak ? ` · ${tr("серия")}: ${streak} ${plural(streak, "день", "дня", "дней")} 🔥` : ""}</p>
+    <button class="primary" id="pClose">${tr("Закрыть")}</button></div>`;
   $("#pClose").onclick = closePractice;
   $("#pTime").textContent = "";
   $("#pBar").style.strokeDashoffset = 0;

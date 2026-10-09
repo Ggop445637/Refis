@@ -1,4 +1,5 @@
 // Точка входа: навигация, командная палитра, горячие клавиши, вставка/перетаскивание, статус.
+import { tr, translateStatic, rememberLang } from "./i18n.js";
 import { $, $$, api, esc, store, toast, on, emit, transition, isTyping, clipboardImages, modalOpen, closeModal, files } from "./util.js";
 import {
   state as lib, initLibrary, load, loadTags, loadFolders, loadSaved, libraryKey, uploadDialog, folderDialog,
@@ -77,9 +78,9 @@ async function poll() {
   $('[data-count="all"]').textContent = s.total - (s.missing || 0) || "";
   const busy = s.scan.running || s.thumbs_pending > 0;
   let text = "";
-  if (s.scan.running) text = `Сканирую… новых: ${s.scan.added}`;
-  else if (s.thumbs_pending) text = `Создаю превью… осталось ${s.thumbs_pending}`;
-  if (!s.ffmpeg) text += (text ? " · " : "") + "ffmpeg не найден — нет превью видео";
+  if (s.scan.running) text = `${tr("Сканирую… новых")}: ${s.scan.added}`;
+  else if (s.thumbs_pending) text = `${tr("Создаю превью… осталось")} ${s.thumbs_pending}`;
+  if (!s.ffmpeg) text += (text ? " · " : "") + tr("ffmpeg не найден — нет превью видео");
   const st = $("#scanText");
   st.textContent = text;
   st.className = busy ? "scanning" : "";
@@ -102,11 +103,11 @@ on("poll", poll);
 
 let pinned = false;
 async function togglePin() {
-  if (!window.pywebview?.api?.set_on_top) return toast("Доступно только в приложении");
+  if (!window.pywebview?.api?.set_on_top) return toast(tr("Доступно только в приложении"));
   pinned = await window.pywebview.api.set_on_top(!pinned);
   $("#pinBtn").classList.toggle("on", pinned);
   $("#bPin")?.classList.toggle("on", pinned);
-  toast(pinned ? "📌 Окно поверх остальных" : "Окно больше не поверх остальных", { life: 1600 });
+  toast(pinned ? tr("📌 Окно поверх остальных") : tr("Окно больше не поверх остальных"), { life: 1600 });
 }
 on("toggle-pin", togglePin);
 $("#pinBtn").onclick = togglePin;
@@ -116,31 +117,31 @@ addEventListener("pywebviewready", () => { $("#pinBtn").hidden = false; const b 
 
 function commands() {
   const list = [
-    { g: "Переход", ic: "☀", t: "Сегодня", run: () => go("today"), k: "Ctrl 1" },
-    { g: "Переход", ic: "▦", t: "Библиотека", run: () => go("library"), k: "Ctrl 2" },
-    { g: "Переход", ic: "◫", t: "Доски", run: () => go("boards"), k: "Ctrl 3" },
-    { g: "Переход", ic: "🧹", t: "Порядок в библиотеке", run: () => go("organize"), k: "Ctrl 4" },
-    { g: "Переход", ic: "📌", t: "Pinterest", run: () => go("pinterest"), k: "Ctrl 5" },
-    { g: "Действия", ic: "🎲", t: "Нарисуй это — задание из моих тем", run: () => startChallenge() },
-    { g: "Действия", ic: "🏷", t: "Быстрая разметка файлов без тегов", run: () => openTriage() },
-    { g: "Действия", ic: "⏱", t: "Тренировка набросков", run: () => { go("library"); practiceDialog({ params: filterParams(), total: lib.total }); } },
-    { g: "Действия", ic: "◫", t: "Новая доска", run: () => createBoard() },
-    { g: "Действия", ic: "＋", t: "Добавить папку", run: () => folderDialog() },
-    { g: "Действия", ic: "⟳", t: "Пересканировать все папки", run: async () => { await api("/scan", { method: "POST" }); poll(); toast("Сканирую…"); } },
-    { g: "Действия", ic: "◨", t: "Показать/скрыть панель деталей", run: () => { go("library"); toggleDetails(); }, k: "I" },
-    { g: "Действия", ic: "📌", t: "Окно поверх всех окон", run: togglePin },
-    { g: "Переход", ic: "👤", t: "Профиль и статистика", run: () => go("profile") },
-    { g: "Переход", ic: "⚙", t: "Настройки", run: () => go("settings") },
-    { g: "Действия", ic: "💾", t: "Создать резервную копию", run: async () => { const r = await api("/backup", { method: "POST" }); toast(`Копия: ${r.path}`, { life: 6000 }); } },
-    { g: "Библиотека", ic: "★", t: "Избранное", run: () => { go("library"); applyQuery({ view: "fav" }); } },
-    { g: "Библиотека", ic: "🏷", t: "Файлы без тегов", run: () => { go("library"); applyQuery({ view: "untagged" }); } },
-    { g: "Библиотека", ic: "⧉", t: "Дубликаты", run: () => { go("library"); applyQuery({ view: "dupes" }); } },
-    { g: "Библиотека", ic: "▶", t: "Только видео", run: () => { go("library"); applyQuery({ type: "video" }); } },
-    { g: "Библиотека", ic: "🔀", t: "Случайный порядок", run: () => { go("library"); const { view, folder, tags, ntags, q, type, orient, minRating } = lib; applyQuery({ view, folder, tags, ntags, q, type, orient, minRating, sort: "random" }); } },
+    { g: tr("Переход"), ic: "☀", t: tr("Сегодня"), run: () => go("today"), k: "Ctrl 1" },
+    { g: tr("Переход"), ic: "▦", t: tr("Библиотека"), run: () => go("library"), k: "Ctrl 2" },
+    { g: tr("Переход"), ic: "◫", t: tr("Доски"), run: () => go("boards"), k: "Ctrl 3" },
+    { g: tr("Переход"), ic: "🧹", t: tr("Порядок в библиотеке"), run: () => go("organize"), k: "Ctrl 4" },
+    { g: tr("Переход"), ic: "📌", t: "Pinterest", run: () => go("pinterest"), k: "Ctrl 5" },
+    { g: tr("Действия"), ic: "🎲", t: tr("Нарисуй это — задание из моих тем"), run: () => startChallenge() },
+    { g: tr("Действия"), ic: "🏷", t: tr("Быстрая разметка файлов без тегов"), run: () => openTriage() },
+    { g: tr("Действия"), ic: "⏱", t: tr("Тренировка набросков"), run: () => { go("library"); practiceDialog({ params: filterParams(), total: lib.total }); } },
+    { g: tr("Действия"), ic: "◫", t: tr("Новая доска"), run: () => createBoard() },
+    { g: tr("Действия"), ic: "＋", t: tr("Добавить папку"), run: () => folderDialog() },
+    { g: tr("Действия"), ic: "⟳", t: tr("Пересканировать все папки"), run: async () => { await api("/scan", { method: "POST" }); poll(); toast(tr("Сканирую…")); } },
+    { g: tr("Действия"), ic: "◨", t: tr("Показать/скрыть панель деталей"), run: () => { go("library"); toggleDetails(); }, k: "I" },
+    { g: tr("Действия"), ic: "📌", t: tr("Окно поверх всех окон"), run: togglePin },
+    { g: tr("Переход"), ic: "👤", t: tr("Профиль и статистика"), run: () => go("profile") },
+    { g: tr("Переход"), ic: "⚙", t: tr("Настройки"), run: () => go("settings") },
+    { g: tr("Действия"), ic: "💾", t: tr("Создать резервную копию"), run: async () => { const r = await api("/backup", { method: "POST" }); toast(`${tr("Копия")}: ${r.path}`, { life: 6000 }); } },
+    { g: tr("Библиотека"), ic: "★", t: tr("Избранное"), run: () => { go("library"); applyQuery({ view: "fav" }); } },
+    { g: tr("Библиотека"), ic: "🏷", t: tr("Файлы без тегов"), run: () => { go("library"); applyQuery({ view: "untagged" }); } },
+    { g: tr("Библиотека"), ic: "⧉", t: tr("Дубликаты"), run: () => { go("library"); applyQuery({ view: "dupes" }); } },
+    { g: tr("Библиотека"), ic: "▶", t: tr("Только видео"), run: () => { go("library"); applyQuery({ type: "video" }); } },
+    { g: tr("Библиотека"), ic: "🔀", t: tr("Случайный порядок"), run: () => { go("library"); const { view, folder, tags, ntags, q, type, orient, minRating } = lib; applyQuery({ view, folder, tags, ntags, q, type, orient, minRating, sort: "random" }); } },
   ];
-  (lib.saved || []).forEach((s) => list.push({ g: "Сохранённые поиски", ic: "☆", t: s.name, run: () => { go("library"); applyQuery(s.query); } }));
-  (paletteBoards || []).forEach((b) => list.push({ g: "Доски", ic: "◫", t: b.name, run: () => openBoard(b.id) }));
-  lib.allTags.forEach((t) => list.push({ g: "Теги", ic: "#", t: t.name, sub: t.count, run: () => { lib.tags = []; lib.ntags = []; toggleTag(t.name); } }));
+  (lib.saved || []).forEach((s) => list.push({ g: tr("Сохранённые поиски"), ic: "☆", t: s.name, run: () => { go("library"); applyQuery(s.query); } }));
+  (paletteBoards || []).forEach((b) => list.push({ g: tr("Доски"), ic: "◫", t: b.name, run: () => openBoard(b.id) }));
+  lib.allTags.forEach((t) => list.push({ g: tr("Теги"), ic: "#", t: t.name, sub: t.count, run: () => { lib.tags = []; lib.ntags = []; toggleTag(t.name); } }));
   return list;
 }
 let paletteBoards = [];
@@ -164,7 +165,7 @@ async function openPalette() {
   const p = $("#palette");
   if (!p.hidden) return closePalette();
   api("/boards").then((b) => (paletteBoards = b)).catch(() => {});
-  p.innerHTML = `<div class="pal"><input id="palIn" placeholder="Что сделать? Поиск по командам, тегам, доскам…" autocomplete="off"><ul id="palList"></ul></div>`;
+  p.innerHTML = `<div class="pal"><input id="palIn" placeholder="${tr("Что сделать? Поиск по командам, тегам, доскам…")}" autocomplete="off"><ul id="palList"></ul></div>`;
   p.hidden = false;
   let sel = 0, shown = [];
   const draw = () => {
@@ -176,7 +177,7 @@ async function openPalette() {
     $("#palList").innerHTML = shown.map((c, i) => {
       const head = !q && c.g !== g ? `<div class="group">${esc((g = c.g))}</div>` : "";
       return `${head}<li data-i="${i}" class="${i === sel ? "on" : ""}"><span class="ic">${c.ic}</span><span>${highlight(q, c.t)}</span>${c.k ? `<kbd class="sub">${c.k}</kbd>` : c.sub ? `<span class="sub">${c.sub}</span>` : ""}</li>`;
-    }).join("") || `<li class="muted">Ничего не найдено</li>`;
+    }).join("") || `<li class="muted">${tr("Ничего не найдено")}</li>`;
     $("#palList li.on")?.scrollIntoView({ block: "nearest" });
   };
   const run = (i) => { const c = shown[i]; closePalette(); c?.run(); };
@@ -246,7 +247,7 @@ addEventListener("drop", (e) => {
   $("#dropzone").hidden = true;
   if (page === "board") return boardDrop(e);
   const list = [...e.dataTransfer.files].filter((f) => /\.(jpe?g|jfif|png|gif|webp|bmp|tiff?|psd|mp4|webm|mov|m4v|mkv|avi|wmv|flv|mpe?g)$/i.test(f.name));
-  if (!list.length) return toast("Здесь нет картинок или видео");
+  if (!list.length) return toast(tr("Здесь нет картинок или видео"));
   uploadDialog(list);
 });
 
@@ -255,7 +256,9 @@ addEventListener("resize", () => { movePill("#mainNav"); movePill("#views"); });
 // ======================================================================= старт
 
 (async function init() {
+  translateStatic();
   await loadSettings().catch(() => {});
+  if (appSettings.lang && rememberLang(appSettings.lang)) return location.reload(); // язык сменили в другом окне
   initLibrary();
   await Promise.all([loadFolders(), loadTags(), loadSaved()]).catch(() => {});
   const start = appSettings.start_page === "last" ? store("page") : appSettings.start_page;

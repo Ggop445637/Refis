@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from .i18n import tr
 from . import db, media
 from .net import http_get
 
@@ -34,7 +35,7 @@ def parse_source(text: str) -> dict:
     """Ссылка на профиль/доску или имя пользователя → RSS-лента."""
     text = text.strip().strip("<>\"'")
     if not text:
-        raise ValueError("Пустая ссылка")
+        raise ValueError(tr("Пустая ссылка"))
     if "pin.it/" in text:  # короткая ссылка из приложения — раскрываем
         _, _, final = http_get(text if text.startswith("http") else "https://" + text)
         text = final
@@ -44,18 +45,18 @@ def parse_source(text: str) -> dict:
         else:  # просто имя пользователя
             user = text.lstrip("@").strip("/")
             if not re.fullmatch(r"[A-Za-z0-9_.\-]{2,40}", user):
-                raise ValueError("Не похоже на ссылку Pinterest или имя пользователя")
+                raise ValueError(tr("Не похоже на ссылку Pinterest или имя пользователя"))
             return _source(user, None)
     u = urlparse(text)
     if "pinterest." not in u.netloc:
-        raise ValueError("Это не ссылка на Pinterest")
+        raise ValueError(tr("Это не ссылка на Pinterest"))
     parts = [p for p in u.path.split("/") if p]
     if parts and parts[-1].endswith(".rss"):
         parts[-1] = parts[-1][:-4]
         if parts[-1] == "feed":
             parts = parts[:-1]
     if not parts or parts[0] in _RESERVED:
-        raise ValueError("Нужна ссылка на профиль или доску, например pinterest.com/имя/доска")
+        raise ValueError(tr("Нужна ссылка на профиль или доску, например pinterest.com/имя/доска"))
     return _source(parts[0], parts[1] if len(parts) > 1 else None)
 
 
@@ -65,7 +66,7 @@ def _source(user: str, board: str | None) -> dict:
                 "page": f"https://www.pinterest.com/{user}/{board}/",
                 "title": board.replace("-", " ").strip(), "tag": db.normalize_tag(board.replace("-", " "))}
     return {"kind": "user", "url": f"https://www.pinterest.com/{user}/feed.rss",
-            "page": f"https://www.pinterest.com/{user}/", "title": f"Профиль {user}", "tag": ""}
+            "page": f"https://www.pinterest.com/{user}/", "title": tr("Профиль {user}", user=user), "tag": ""}
 
 
 # ======================================================================= лента
@@ -77,7 +78,7 @@ def parse_feed(data: bytes) -> tuple[str, list[dict]]:
     root = ET.fromstring(data)
     ch = root.find("channel")
     if ch is None:
-        raise ValueError("Pinterest вернул не RSS-ленту (доска приватная или ссылка неверна)")
+        raise ValueError(tr("Pinterest вернул не RSS-ленту (доска приватная или ссылка неверна)"))
     title = html.unescape((ch.findtext("title") or "").strip())
     items = []
     for it in ch.findall("item"):
@@ -122,7 +123,7 @@ def sync_source(sid: int) -> dict:
         data, _, _ = http_get(s["url"])
         title, items = parse_feed(data)
     except Exception as e:
-        msg = str(e) if isinstance(e, ValueError) else f"Не удалось загрузить ленту: {e}"
+        msg = str(e) if isinstance(e, ValueError) else tr("Не удалось загрузить ленту: {e}", e=e)
         conn.execute("UPDATE pin_sources SET last_error = ?, last_sync = ? WHERE id = ?", (msg, time.time(), sid))
         log.warning("pinterest %s: %s", s["url"], e)
         return {"added": 0, "error": msg}
@@ -184,14 +185,14 @@ def download_image(url: str) -> tuple[bytes, str]:
                 return data, ext
         except Exception as e:
             last = e
-    raise RuntimeError(f"Не удалось скачать картинку: {last}")
+    raise RuntimeError(tr("Не удалось скачать картинку: {e}", e=last))
 
 
 def save_pins(ids: list[int], folder_id: int, subdir: str | None, tags: list[str] | None) -> list[dict]:
     conn = db.connect()
     folder = conn.execute("SELECT * FROM folders WHERE id = ?", (folder_id,)).fetchone()
     if not folder:
-        raise ValueError("Папка не найдена")
+        raise ValueError(tr("Папка не найдена"))
     out = []
     for pid in ids:
         p = conn.execute("SELECT p.*, s.title board, s.tag stag FROM pins p JOIN pin_sources s ON s.id = p.source_id"
@@ -281,20 +282,20 @@ def save_from_browser(raw: dict) -> dict:
     """Кнопка «＋ Refis» на пине: сохраняем в библиотеку сразу."""
     it = _clean(raw) if isinstance(raw, dict) else None
     if not it:
-        return {"ok": False, "error": "Не удалось распознать пин"}
+        return {"ok": False, "error": tr("Не удалось распознать пин")}
     folder = default_folder()
     if not folder:
-        return {"ok": False, "error": "Сначала добавьте папку библиотеки в Refis"}
+        return {"ok": False, "error": tr("Сначала добавьте папку библиотеки в Refis")}
     conn = db.connect()
     conn.execute("INSERT OR IGNORE INTO pins(guid, source_id, title, link, image, added_at) VALUES (?,?,?,?,?,?)",
                  (it["guid"], feed_source_id(), it["title"], it["link"], it["image"], time.time()))
     pin = conn.execute("SELECT id, status, media_id FROM pins WHERE guid = ?", (it["guid"],)).fetchone()
     if pin["status"] == "saved":
         return {"ok": True, "already": True, "media": pin["media_id"]}
-    res = save_pins([pin["id"]], folder["id"], "Pinterest/Сохранённые из ленты", None)
+    res = save_pins([pin["id"]], folder["id"], "Pinterest/" + tr("Сохранённые из ленты"), None)
     if res and "media" in res[0]:
         return {"ok": True, "media": res[0]["media"]}
-    return {"ok": False, "error": (res[0].get("error") if res else "Не сохранено")}
+    return {"ok": False, "error": (res[0].get("error") if res else tr("Не сохранено"))}
 
 
 # ======================================================================= API
@@ -315,9 +316,13 @@ class SourcePatch(BaseModel):
 
 @router.get("/sources")
 def sources():
-    return [dict(r) for r in db.connect().execute(
+    rows = [dict(r) for r in db.connect().execute(
         "SELECT s.*, (SELECT COUNT(*) FROM pins p WHERE p.source_id = s.id AND p.status = 'new') new,"
         " (SELECT COUNT(*) FROM pins p WHERE p.source_id = s.id) total FROM pin_sources s ORDER BY s.kind DESC, s.title")]
+    for r in rows:
+        if r["kind"] == "feed":
+            r["title"] = tr("Рекомендации")
+    return rows
 
 
 @router.post("/sources")
@@ -327,10 +332,10 @@ def add_source(s: SourceIn):
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:
-        raise HTTPException(400, f"Не удалось открыть ссылку: {e}")
+        raise HTTPException(400, tr("Не удалось открыть ссылку: {e}", e=e))
     conn = db.connect()
     if conn.execute("SELECT 1 FROM pin_sources WHERE url = ?", (src["url"],)).fetchone():
-        raise HTTPException(400, "Эта доска уже подключена")
+        raise HTTPException(400, tr("Эта доска уже подключена"))
     sid = conn.execute(
         "INSERT INTO pin_sources(url, page, kind, title, tag, folder_id, auto_save) VALUES (?,?,?,?,?,?,?)",
         (src["url"], src["page"], src["kind"], src["title"], db.normalize_tag(s.tag) if s.tag else src["tag"],
@@ -441,7 +446,7 @@ def pin_image(pid: int, full: bool = False):
                     data, _, _ = http_get(r["image"])
                 small.write_bytes(data)
         except Exception as e:
-            raise HTTPException(502, f"Нет связи с Pinterest: {e}")
+            raise HTTPException(502, tr("Нет связи с Pinterest: {e}", e=e))
     if full:
         ext = big.with_suffix(".ext").read_text() if big.with_suffix(".ext").exists() else ".jpg"
         mt = {".png": "image/png", ".gif": "image/gif", ".webp": "image/webp"}.get(ext, "image/jpeg")
