@@ -39,11 +39,55 @@ def wait_ready(url: str, timeout: float = 20) -> None:
             time.sleep(0.15)
 
 
+class PinterestBridge:
+    """Единственное, что доступно странице pinterest.com в окне Refis: передать пины. Данные проверяются."""
+
+    def collect(self, items):
+        from .pinterest import collect_feed
+        return collect_feed(items if isinstance(items, list) else [])
+
+    def save(self, item):
+        from .pinterest import save_from_browser
+        return save_from_browser(item)
+
+
 class JsApi:
     """Функции, доступные интерфейсу внутри окна (window.pywebview.api)."""
 
     def __init__(self):
         self._window = None
+        self._pin = None
+
+    def open_pinterest(self, url="https://www.pinterest.com/"):
+        """Окно с настоящим pinterest.com: вход в аккаунт запоминается, на пинах — кнопка «＋ Refis»."""
+        import webview
+        if not str(url).startswith("https://www.pinterest.com/"):
+            url = "https://www.pinterest.com/"
+        if self._pin is not None:
+            try:
+                self._pin.restore()
+                self._pin.show()
+                return True
+            except Exception:
+                self._pin = None
+        from pathlib import Path
+        script = (Path(__file__).resolve().parent / "static" / "pinterest-bridge.js").read_text(encoding="utf-8")
+        win = webview.create_window("Pinterest — Refis", url, js_api=PinterestBridge(), width=1280, height=900,
+                                    background_color="#ffffff")
+
+        def inject():
+            try:
+                win.evaluate_js(script)
+            except Exception as e:
+                log.warning("pinterest bridge: %s", e)
+
+        def closed():
+            self._pin = None
+
+        win.events.loaded += inject
+        win.events.closed += closed
+        self._pin = win
+        return True
 
     def pick_folder(self):
         import webview

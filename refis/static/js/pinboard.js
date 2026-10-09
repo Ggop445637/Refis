@@ -2,6 +2,7 @@
 import { $, $$, api, esc, toast, modal, menu, confirmDialog, emit, plural, files, store } from "./util.js";
 import { openViewer } from "./viewer.js";
 import { state as lib, loadTags, loadFolders } from "./library.js";
+import { openUrl } from "./settings.js";
 
 const PG = { status: "new", source: 0, items: [], sel: new Set(), sources: [] };
 const pinsWord = (n) => `${n} ${plural(n, "пин", "пина", "пинов")}`;
@@ -14,11 +15,12 @@ export async function renderPinterest() {
   root.innerHTML = `
     <header class="rise pin-head"><div><h1>Pinterest</h1>
       <p class="muted">Новые пины с ваших досок. Сохраните нужные в библиотеку — они получат тег доски и попадут в задания.</p></div>
-      <div class="row"><button id="pinSync">⟳ Обновить</button><button class="primary" id="pinAdd">＋ Подключить доску</button></div></header>
+      <div class="row"><button id="pinSync">⟳ Обновить</button><button id="pinAdd">＋ Подключить доску</button>
+        <button class="primary" id="pinOpen">✨ Открыть Pinterest</button></div></header>
     <div class="pin-sources rise" style="--d:1">
       <button class="chip-btn ${PG.source ? "" : "on"}" data-s="0">Все доски</button>
-      ${PG.sources.map((s) => `<button class="chip-btn ${PG.source === s.id ? "on" : ""} ${s.last_error ? "err" : ""}" data-s="${s.id}" title="${esc(s.last_error || s.page)}">
-        ${s.kind === "user" ? "👤" : "📌"} ${esc(s.title || s.page)} ${s.new ? `<b>${s.new}</b>` : ""}${s.auto_save ? " ⬇" : ""}</button>`).join("")}
+      ${PG.sources.map((s) => `<button class="chip-btn ${PG.source === s.id ? "on" : ""} ${s.last_error ? "err" : ""}" data-s="${s.id}" title="${esc(s.last_error || (s.kind === "feed" ? "Пины из вашей домашней ленты" : s.page))}">
+        ${s.kind === "feed" ? "✨" : s.kind === "user" ? "👤" : "📌"} ${esc(s.title || s.page)} ${s.new ? `<b>${s.new}</b>` : ""}${s.auto_save ? " ⬇" : ""}</button>`).join("")}
     </div>
     ${PG.sources.filter((s) => s.last_error).map((s) => `<div class="pin-err rise">⚠ «${esc(s.title)}»: ${esc(s.last_error)}</div>`).join("")}
     <div class="row pin-tabs rise" style="--d:2">
@@ -35,6 +37,7 @@ export async function renderPinterest() {
     </div>
     <div class="pin-grid" id="pinGrid"></div>`;
   $("#pinSync").onclick = syncAll;
+  $("#pinOpen").onclick = openPinterestWindow;
   $("#pinAdd").onclick = () => connectDialog();
   $$(".pin-sources [data-s]").forEach((b) => {
     b.onclick = () => { PG.source = +b.dataset.s; PG.sel.clear(); renderPinterest(); };
@@ -54,8 +57,11 @@ function renderConnect(root) {
     <div class="glass pin-hero rise">
       <div class="logo">📌</div>
       <h1>Подключите Pinterest</h1>
-      <p>Вставьте ссылку на свою доску или профиль. Refis будет забирать новые пины, а вы — сохранять нужные в библиотеку
-        с тегом по названию доски. Пины также попадут в задания «Нарисуй это».</p>
+      <p><b>Рекомендации.</b> Откройте Pinterest внутри Refis и войдите в свой аккаунт — пока вы листаете домашнюю ленту,
+        Refis собирает её пины в «Рекомендации», а на каждом пине появляется кнопка «＋ Refis» для сохранения в библиотеку.</p>
+      <div class="row"><button class="primary" id="pinOpen">✨ Открыть Pinterest в Refis</button></div>
+      <p style="margin-top:14px"><b>Доски.</b> Или вставьте ссылку на свою публичную доску или профиль — Refis будет сам забирать новые пины.
+        Они получат тег по названию доски и попадут в задания «Нарисуй это».</p>
       <div class="row pin-input"><input type="text" id="pinUrl" placeholder="https://pinterest.com/имя/название-доски/">
         <button class="primary" id="pinGo">Подключить</button></div>
       <div class="hint">Примеры: <code>pinterest.com/anna_art/anatomy/</code> — доска · <code>anna_art</code> — последние пины профиля.<br>
@@ -69,6 +75,7 @@ function renderConnect(root) {
     try { await connect(url); } finally { const b = $("#pinGo"); if (b) { b.disabled = false; b.textContent = "Подключить"; } }
   };
   $("#pinGo").onclick = go;
+  $("#pinOpen").onclick = openPinterestWindow;
   $("#pinUrl").onkeydown = (e) => { if (e.key === "Enter") go(); };
   setTimeout(() => $("#pinUrl")?.focus(), 50);
 }
@@ -129,7 +136,7 @@ async function loadPins() {
         p.status !== "saved" && ["Сохранить в библиотеку…", () => saveDialog([id])],
         p.status === "new" && ["Скрыть", () => setStatus([id], "hidden")],
         p.status === "hidden" && ["Вернуть в новые", () => setStatus([id], "new")],
-        p.link && ["Открыть на Pinterest", () => window.open(p.link, "_blank")],
+        p.link && ["Открыть на Pinterest", () => openUrl(p.link)],
       ]);
     };
   });
@@ -193,11 +200,28 @@ function saveDialog(ids) {
     });
 }
 
+/** Окно с pinterest.com внутри Refis (только в приложении; в браузере — обычная вкладка). */
+export async function openPinterestWindow() {
+  if (window.pywebview?.api?.open_pinterest) {
+    await window.pywebview.api.open_pinterest();
+    toast("Войдите в Pinterest и листайте ленту — рекомендации появятся здесь", { life: 6000 });
+    clearInterval(PG.watch);
+    PG.watch = setInterval(async () => {
+      updatePinBadge(await api("/pinterest/sources").catch(() => []));
+      if ($('.page[data-page="pinterest"]').classList.contains("active") && !PG.sel.size) loadPins();
+    }, 8000);
+    return;
+  }
+  openUrl("https://www.pinterest.com/");
+  toast("Сбор рекомендаций и кнопка «＋ Refis» работают в окне приложения Refis, а не в браузере", { life: 7000 });
+}
+
 function sourceMenu(e, s) {
   menu(e, [
-    ["Обновить", async () => { const r = await api(`/pinterest/sources/${s.id}/sync`, { method: "POST" }); toast(r.error ? r.error : `Новых: ${r.added}`, { error: !!r.error }); renderPinterest(); }],
+    s.kind === "feed" && ["Открыть Pinterest", openPinterestWindow],
+    s.kind !== "feed" && ["Обновить", async () => { const r = await api(`/pinterest/sources/${s.id}/sync`, { method: "POST" }); toast(r.error ? r.error : `Новых: ${r.added}`, { error: !!r.error }); renderPinterest(); }],
     ["Настройки…", () => sourceSettings(s)],
-    ["Открыть в браузере", () => window.open(s.page, "_blank")],
+    ["Открыть в браузере", () => openUrl(s.page)],
     "-",
     ["Отключить…", () => confirmDialog("Отключить доску?", `«${s.title}» исчезнет из Refis вместе с несохранёнными пинами. Уже сохранённые картинки останутся в библиотеке.`,
       async () => { await api(`/pinterest/sources/${s.id}`, { method: "DELETE" }); PG.source = 0; renderPinterest(); }, "Отключить")],

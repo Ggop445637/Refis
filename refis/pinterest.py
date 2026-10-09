@@ -116,7 +116,7 @@ def image_candidates(url: str) -> list[str]:
 def sync_source(sid: int) -> dict:
     conn = db.connect()
     s = conn.execute("SELECT * FROM pin_sources WHERE id = ?", (sid,)).fetchone()
-    if not s:
+    if not s or s["kind"] == "feed":  # рекомендации приходят из окна Pinterest, не из RSS
         return {"added": 0}
     try:
         data, _, _ = http_get(s["url"])
@@ -148,7 +148,7 @@ def sync_all(force: bool = False) -> None:
         return
     try:
         conn = db.connect()
-        for s in conn.execute("SELECT id, last_sync FROM pin_sources").fetchall():
+        for s in conn.execute("SELECT id, last_sync FROM pin_sources WHERE kind != 'feed'").fetchall():
             if force or not s["last_sync"] or time.time() - s["last_sync"] > SYNC_EVERY:
                 sync_source(s["id"])
     finally:
@@ -221,6 +221,80 @@ def save_pins(ids: list[int], folder_id: int, subdir: str | None, tags: list[str
             out.append({"pin": pid, "error": str(e)})
     media.thumbs.kick()
     return out
+
+
+# ======================================================================= рекомендации из окна Pinterest
+
+FEED_URL = "feed://home"
+_PIN_ID = re.compile(r"^\d{5,25}$")
+
+
+def feed_source_id() -> int:
+    conn = db.connect()
+    r = conn.execute("SELECT id FROM pin_sources WHERE url = ?", (FEED_URL,)).fetchone()
+    if r:
+        return r["id"]
+    return conn.execute("INSERT INTO pin_sources(url, page, kind, title, tag) VALUES (?,?,?,?,?)",
+                        (FEED_URL, "https://www.pinterest.com/", "feed", "Рекомендации", "")).lastrowid
+
+
+def _clean(item: dict) -> dict | None:
+    """Данные приходят со страницы pinterest.com — проверяем всё."""
+    pid = str(item.get("id", ""))
+    img = str(item.get("image", ""))
+    if not _PIN_ID.match(pid) or not re.match(r"https://i\.pinimg\.com/", img):
+        return None
+    return {"guid": f"https://www.pinterest.com/pin/{pid}/", "link": f"https://www.pinterest.com/pin/{pid}/",
+            "image": img, "title": str(item.get("title", ""))[:200]}
+
+
+def collect_feed(items: list) -> int:
+    """Пины, которые пользователь видит в домашней ленте Pinterest, → источник «Рекомендации»."""
+    from . import system
+    if not system.get("pinterest_feed"):
+        return 0
+    conn = db.connect()
+    sid = feed_source_id()
+    new_ids = []
+    for raw in items[:300]:
+        it = _clean(raw) if isinstance(raw, dict) else None
+        if it:
+            cur = conn.execute("INSERT OR IGNORE INTO pins(guid, source_id, title, link, image, added_at) VALUES (?,?,?,?,?,?)",
+                               (it["guid"], sid, it["title"], it["link"], it["image"], time.time()))
+            if cur.rowcount:
+                new_ids.append(cur.lastrowid)
+    if new_ids:
+        conn.execute("UPDATE pin_sources SET last_sync = ? WHERE id = ?", (time.time(), sid))
+        src = conn.execute("SELECT auto_save, folder_id FROM pin_sources WHERE id = ?", (sid,)).fetchone()
+        if src["auto_save"] and src["folder_id"]:
+            threading.Thread(target=save_pins, args=(new_ids, src["folder_id"], None, None), daemon=True).start()
+    return len(new_ids)
+
+
+def default_folder():
+    conn = db.connect()
+    return (conn.execute("SELECT id FROM folders WHERE kind = 'ref' ORDER BY id LIMIT 1").fetchone()
+            or conn.execute("SELECT id FROM folders ORDER BY id LIMIT 1").fetchone())
+
+
+def save_from_browser(raw: dict) -> dict:
+    """Кнопка «＋ Refis» на пине: сохраняем в библиотеку сразу."""
+    it = _clean(raw) if isinstance(raw, dict) else None
+    if not it:
+        return {"ok": False, "error": "Не удалось распознать пин"}
+    folder = default_folder()
+    if not folder:
+        return {"ok": False, "error": "Сначала добавьте папку библиотеки в Refis"}
+    conn = db.connect()
+    conn.execute("INSERT OR IGNORE INTO pins(guid, source_id, title, link, image, added_at) VALUES (?,?,?,?,?,?)",
+                 (it["guid"], feed_source_id(), it["title"], it["link"], it["image"], time.time()))
+    pin = conn.execute("SELECT id, status, media_id FROM pins WHERE guid = ?", (it["guid"],)).fetchone()
+    if pin["status"] == "saved":
+        return {"ok": True, "already": True, "media": pin["media_id"]}
+    res = save_pins([pin["id"]], folder["id"], "Pinterest/Сохранённые из ленты", None)
+    if res and "media" in res[0]:
+        return {"ok": True, "media": res[0]["media"]}
+    return {"ok": False, "error": (res[0].get("error") if res else "Не сохранено")}
 
 
 # ======================================================================= API
