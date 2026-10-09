@@ -203,8 +203,6 @@ svg.i { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none;
 .list li.exc .name { text-decoration: line-through; }
 .list li.active { background: var(--surface-2); color: var(--text); }
 .list li.empty { cursor: default; color: var(--text-3); font-size: 12px; }
-#folderlist { max-height: 150px; }
-#folderlist .name { direction: rtl; text-align: left; }
 #savedlist { max-height: 120px; }
 
 .sb-foot { display: flex; gap: 6px; align-items: center; padding-top: 8px; border-top: 1px solid var(--line); }
@@ -993,3 +991,20 @@ body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after 
 /* ---------- наборы референсов */
 .packprev { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 4px 0 10px; }
 .packprev img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: var(--panel); }
+
+/* ---------- дерево папок, перетаскивание карточек */
+#folderlist { max-height: 260px; flex-shrink: 0; }
+#sidebar > * { flex-shrink: 0; }
+#sidebar > .sb-section.grow { flex-shrink: 1; }
+#nNew, #kNewBox { display: flex; flex-direction: column; gap: inherit; }
+#nNew[hidden], #kNewBox[hidden], #kSubBox[hidden] { display: none; }
+#folderlist li { padding-top: 4px; padding-bottom: 4px; gap: 6px; }
+#folderlist .name { direction: ltr; }
+#folderlist .caret { background: none; border: 0; padding: 0; width: 14px; min-width: 14px; color: var(--text-3); font-size: 10px; cursor: pointer; }
+#folderlist .caret.none { visibility: hidden; }
+#folderlist li.subdir .name { font-size: 13px; }
+body.dragging-cards #folderlist li[data-id] { outline: 1px dashed var(--line); outline-offset: -1px; }
+#folderlist li.drop { background: rgba(255, 138, 92, .18); color: var(--text); outline: 1px solid var(--accent) !important; }
+.dragcount { position: fixed; top: -100px; left: 0; padding: 8px 12px; border-radius: 10px; font-size: 13px;
+  background: var(--accent); color: #1a1010; font-weight: 600; pointer-events: none; }
+.movelist { max-height: 320px; margin: 10px 0; }

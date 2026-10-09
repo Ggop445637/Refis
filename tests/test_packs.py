@@ -135,3 +135,38 @@ def test_save_frame_from_video(client):
     bad = client.post(f"/api/media/{v['id']}/frame", files={"file": ("f.jpg", b"<svg/>", "image/jpeg")})
     assert bad.status_code == 400
     assert client.post(f"/api/media/{r['id']}/frame", files={"file": ("f.jpg", jpeg_bytes(), "image/jpeg")}).status_code == 404
+
+
+def test_export_and_import_whole_folder(client):
+    root = TMP / "Мои арты-src"
+    for rel, color in (("Руки/a.jpg", "red"), ("Руки/Мужские/b.jpg", "green"), ("c.jpg", "blue")):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (120, 90), color).save(root / rel)
+    before = client.get("/api/status").json()["total"]
+    f = client.post("/api/folders", json={"path": str(root), "kind": "own"}).json()
+    wait_scan(client, before + 3)
+    est = client.post("/api/packs/estimate", json={"folder_id": f["id"], "sub": "Руки"}).json()
+    assert est["count"] == 2
+    from refis import packs
+    r = packs.build_pack(packs.ExportIn(name="Мои арты", folder_id=f["id"]), TMP / "folder.refis")
+    assert r["count"] == 3
+    with zipfile.ZipFile(TMP / "folder.refis") as z:
+        m = json.loads(z.read("refis-pack.json"))
+        assert m["folder"] == {"name": "Мои арты-src", "kind": "own"}
+        assert sorted(i["dir"] for i in m["items"]) == ["", "Руки", "Руки/Мужские"]
+        assert "files/Руки/Мужские/b.jpg" in z.namelist()
+
+    client.delete(f"/api/folders/{f['id']}")  # как будто это другой компьютер: в библиотеке этих файлов нет
+    with open(TMP / "folder.refis", "rb") as fh:
+        info = client.post("/api/packs/inspect", files={"file": ("folder.refis", fh)}).json()
+    assert info["folder"] == {"name": "Мои арты-src", "kind": "own"} and info["dirs"] == 2 and info["own"] == 3
+    res = client.post("/api/packs/import", json={"token": info["token"], "new_parent": str(TMP / "pc2"),
+                                                  "new_name": "Мои арты", "new_kind": "own", "own_as_ref": False}).json()
+    new_root = TMP / "pc2" / "Мои арты"
+    assert sorted(p.relative_to(new_root).as_posix() for p in new_root.rglob("*.jpg")) == \
+        sorted(["Руки/Мужские/b.jpg", "Руки/a.jpg", "c.jpg"])
+    folder = next(x for x in client.get("/api/folders").json() if x["id"] == res["folder_id"])
+    assert folder["kind"] == "own" and folder["path"] == str(new_root) and folder["count"] == 3
+    assert {client.get(f"/api/media/{i}").json()["kind"] for i in res["added"]} == {"own"}
+    tree = {d["sub"]: d["count"] for d in client.get(f"/api/folders/{res['folder_id']}/tree").json()}
+    assert tree == {"Руки": 2, "Руки/Мужские": 1}

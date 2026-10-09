@@ -14,6 +14,7 @@ import { renderPinterest, updatePinBadge } from "./pinboard.js";
 import { loadSettings, renderSettings, checkUpdatesOnStart, settings as appSettings } from "./settings.js";
 import { renderProfile } from "./profile.js";
 import { openPackFile, importPack, isPackFile } from "./packs.js";
+import { createFolderDialog } from "./folders.js";
 
 let page = null;
 let libLoaded = false;
@@ -128,7 +129,8 @@ function commands() {
     { g: tr("Действия"), ic: "⏱", t: tr("Тренировка набросков"), run: () => { go("library"); practiceDialog({ params: filterParams(), total: lib.total }); } },
     { g: tr("Действия"), ic: "◫", t: tr("Новая доска"), run: () => createBoard() },
     { g: tr("Действия"), ic: "📦", t: tr("Открыть набор референсов (.refis)…"), run: openPackFile },
-    { g: tr("Действия"), ic: "＋", t: tr("Добавить папку"), run: () => folderDialog() },
+    { g: tr("Действия"), ic: "📁", t: tr("Создать новую папку…"), run: () => createFolderDialog() },
+    { g: tr("Действия"), ic: "＋", t: tr("Подключить существующую папку…"), run: () => folderDialog() },
     { g: tr("Действия"), ic: "⟳", t: tr("Пересканировать все папки"), run: async () => { await api("/scan", { method: "POST" }); poll(); toast(tr("Сканирую…")); } },
     { g: tr("Действия"), ic: "◨", t: tr("Показать/скрыть панель деталей"), run: () => { go("library"); toggleDetails(); }, k: "I" },
     { g: tr("Действия"), ic: "📌", t: tr("Окно поверх всех окон"), run: togglePin },
@@ -231,7 +233,8 @@ addEventListener("paste", (e) => {
 });
 
 let dragDepth = 0;
-const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
+// файлы из проводника, а не карточки, которые перетаскивают на папку
+const hasFiles = (e) => { const t = [...(e.dataTransfer?.types || [])]; return t.includes("Files") && !t.includes("text/x-refis-ids"); };
 addEventListener("dragenter", (e) => {
   if (!hasFiles(e) || page === "board") return;
   dragDepth++;

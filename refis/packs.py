@@ -20,7 +20,7 @@ from fastapi.responses import Response
 from PIL import Image, ImageOps
 from pydantic import BaseModel
 
-from . import __version__, db, media
+from . import __version__, db, folders, media
 from .i18n import tr
 
 router = APIRouter(prefix="/api/packs")
@@ -48,6 +48,8 @@ class ExportIn(BaseModel):
     ids: list[int] = []
     board_id: int | None = None
     tag: str = ""      # все файлы с тегом
+    folder_id: int | None = None  # целая папка библиотеки (или её подпапка sub) со всей структурой
+    sub: str = ""
     notes: bool = True  # заметки бывают личными — можно не включать
 
 
@@ -60,15 +62,27 @@ def _board(bid: int | None) -> dict | None:
     return {"name": r["name"], "data": json.loads(r["data"])}
 
 
-def _collect(ids: list[int], board: dict | None, tag: str = "") -> list:
+def _folder(fid: int | None, sub: str):
+    """(папка, корень экспорта на диске) или None."""
+    if not fid:
+        return None
+    f = folders.get_folder(db.connect(), fid)
+    return f, folders.sub_path(f, sub)
+
+
+def _collect(ids: list[int], board: dict | None, tag: str = "", folder=None, sub: str = "") -> list:
     """Файлы набора по порядку, без повторов и без пропавших с диска."""
     conn = db.connect()
+    by_folder = []
+    if folder:
+        c, a = folders.under_clause(folder[0], sub)
+        by_folder = [r[0] for r in conn.execute(f"SELECT m.id FROM media m WHERE {c} ORDER BY m.path", a)]
     by_tag = [r[0] for r in conn.execute(
         "SELECT mt.media_id FROM media_tags mt JOIN tags t ON t.id = mt.tag_id JOIN media m ON m.id = mt.media_id"
         " WHERE t.name = ? ORDER BY m.added_at", (db.normalize_tag(tag),))] if tag.strip() else []
     order = list(dict.fromkeys(
         [i["mid"] for i in (board or {}).get("data", {}).get("items", []) if i.get("type") == "media" and i.get("mid")]
-        + ids + by_tag))
+        + ids + by_tag + by_folder))
     rows = {}
     for k in range(0, len(order), 900):
         part = order[k:k + 900]
@@ -80,11 +94,13 @@ class EstimateIn(BaseModel):
     ids: list[int] = []
     board_id: int | None = None
     tag: str = ""
+    folder_id: int | None = None
+    sub: str = ""
 
 
 @router.post("/estimate")
 def estimate(b: EstimateIn):
-    rows = _collect(b.ids, _board(b.board_id), b.tag)
+    rows = _collect(b.ids, _board(b.board_id), b.tag, _folder(b.folder_id, b.sub), b.sub)
     return {"count": len(rows), "size": sum(r["size"] for r in rows),
             "videos": sum(r["type"] == "video" for r in rows)}
 
@@ -96,21 +112,26 @@ def _tags_of(conn, mid: int) -> list[str]:
 
 def build_pack(e: ExportIn, out: Path) -> dict:
     board = _board(e.board_id)
-    rows = _collect(e.ids, board, e.tag)
+    folder = _folder(e.folder_id, e.sub)
+    rows = _collect(e.ids, board, e.tag, folder, e.sub)
     if not rows:
         raise HTTPException(400, tr("В наборе нет файлов"))
     conn = db.connect()
     items, index, used = [], {}, set()
     for n, r in enumerate(rows):
         base = media.safe_name(os.path.basename(r["path"]))
-        arc = f"files/{base}"
+        rel = ""
+        if folder:  # структура подпапок сохраняется: «Руки/Мужские/…»
+            rel = os.path.relpath(os.path.dirname(r["path"]), folder[1]).replace("\\", "/")
+            rel = "" if rel == "." or rel.startswith("..") else folders.clean_sub(rel)
+        arc = f"files/{rel}/{base}" if rel else f"files/{base}"
         while arc.lower() in used:
-            arc = f"files/{n}_{base}"
+            arc = f"files/{rel}/{n}_{base}" if rel else f"files/{n}_{base}"
         used.add(arc.lower())
         index[r["id"]] = len(items)
-        items.append({"file": arc, "name": r["name"], "type": r["type"], "kind": r["kind"], "tags": _tags_of(conn, r["id"]),
-                      "source": r["source"], "notes": r["notes"] if e.notes else "", "rating": r["rating"],
-                      "_path": r["path"]})
+        items.append({"file": arc, "dir": rel, "name": r["name"], "type": r["type"], "kind": r["kind"],
+                      "tags": _tags_of(conn, r["id"]), "source": r["source"], "notes": r["notes"] if e.notes else "",
+                      "rating": r["rating"], "_path": r["path"]})
     pack_board, assets = None, []
     if board:
         b_items = []
@@ -131,7 +152,8 @@ def build_pack(e: ExportIn, out: Path) -> dict:
         pack_board = {"name": board["name"], "items": b_items, "view": board["data"].get("view")}
     manifest = {"format": FORMAT, "app": f"Refis {__version__}", "name": e.name.strip() or tr("Набор"),
                 "author": e.author.strip(), "description": e.description.strip(), "created": time.time(),
-                "items": [{k: v for k, v in i.items() if k != "_path"} for i in items], "board": pack_board}
+                "items": [{k: v for k, v in i.items() if k != "_path"} for i in items], "board": pack_board,
+                "folder": {"name": os.path.basename(folder[1].rstrip("\\/")), "kind": folder[0]["kind"]} if folder else None}
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".part")
     try:
@@ -237,7 +259,20 @@ def inspect(file: UploadFile = File(...)):
         "size": sum(sizes.get(i["file"], 0) for i in items), "board": bool(m.get("board")),
         "tags": [t for t, _ in sorted(tags.items(), key=lambda x: -x[1])[:12]],
         "preview": [n for n, i in enumerate(items) if media.media_type(i["file"]) == "image"][:12],
+        "folder": _manifest_folder(m), "dirs": len({_item_dir(i) for i in items} - {""}),
+        "own": sum(i.get("kind") == "own" for i in items),
     }
+
+
+def _manifest_folder(m: dict) -> dict | None:
+    f = m.get("folder")
+    if not isinstance(f, dict) or not isinstance(f.get("name"), str):
+        return None
+    return {"name": media.safe_name(f["name"])[:120], "kind": f.get("kind") if f.get("kind") in db.KINDS else "ref"}
+
+
+def _item_dir(it: dict) -> str:
+    return folders.clean_sub(it["dir"]) if isinstance(it.get("dir"), str) else ""
 
 
 @router.get("/inbox/{token}/preview/{n}")
@@ -260,10 +295,14 @@ def preview(token: str, n: int):
 
 class ImportIn(BaseModel):
     token: str
-    folder_id: int
+    folder_id: int | None = None  # в существующую папку библиотеки…
+    new_parent: str = ""          # …или в новую: new_parent/new_name
+    new_name: str = ""
+    new_kind: str = "ref"
     subdir: str = ""
     tag: str = ""          # общий тег для всего набора, например «набор/анатомия»
     board: bool = True     # создать доску, если она есть в наборе
+    own_as_ref: bool = True  # чужие «мои работы» становятся референсами; при переносе своей папки — нет
 
 
 def _existing(conn, path: str) -> int | None:
@@ -278,16 +317,25 @@ def _existing(conn, path: str) -> int | None:
 def import_pack(b: ImportIn):
     src = _inbox(b.token)
     conn = db.connect()
-    folder = conn.execute("SELECT * FROM folders WHERE id = ?", (b.folder_id,)).fetchone()
-    if not folder:
-        raise HTTPException(400, tr("Папка не найдена"))
     with zipfile.ZipFile(src) as z:
         m = read_manifest(z)
         name = str(m.get("name") or tr("Набор"))[:120]
-        dest = media.target_dir(folder["path"], b.subdir.strip() or name)
+        if b.folder_id:
+            folder = conn.execute("SELECT * FROM folders WHERE id = ?", (b.folder_id,)).fetchone()
+            if not folder:
+                raise HTTPException(400, tr("Папка не найдена"))
+            subdir = folders.clean_sub(b.subdir) if b.subdir.strip() else media.safe_name(name)
+        else:
+            if b.new_kind not in db.KINDS:
+                raise HTTPException(400, tr("Неизвестный тип"))
+            path = folders.create_dir(b.new_parent, b.new_name or name)
+            fid = folders.register_folder(conn, path, b.new_kind, scan=False)
+            folder = conn.execute("SELECT * FROM folders WHERE id = ?", (fid,)).fetchone()
+            subdir = folders.clean_sub(b.subdir)
         common = db.normalize_tag(b.tag)
         added, existing, ids = [], [], []
         for it in m["items"]:
+            dest = media.target_dir(folder["path"], "/".join(x for x in (subdir, _item_dir(it)) if x))
             target = media.unique_path(dest, os.path.basename(it["file"]))
             with z.open(it["file"]) as f, open(target, "wb") as out:
                 shutil.copyfileobj(f, out, 1 << 20)
@@ -300,7 +348,8 @@ def import_pack(b: ImportIn):
                     conn.execute("INSERT OR IGNORE INTO media_tags VALUES (?, ?)", (mid, db.tag_id(conn, t)))
             else:
                 kind = it.get("kind")
-                kind = "ref" if kind == "own" else kind  # чужие работы для нас — референсы
+                if kind == "own" and b.own_as_ref:
+                    kind = "ref"  # чужие работы для нас — референсы
                 mid = media.register_file(conn, folder, target, kind if kind in db.KINDS else "", tags,
                                           str(it.get("source") or "")[:500])
                 if mid is None:
@@ -317,7 +366,7 @@ def import_pack(b: ImportIn):
             board_id = _import_board(conn, z, m["board"], ids, name)
     src.unlink(missing_ok=True)
     media.thumbs.kick()
-    return {"added": added, "existing": existing, "board_id": board_id, "name": name}
+    return {"added": added, "existing": existing, "board_id": board_id, "name": name, "folder_id": folder["id"]}
 
 
 def _import_board(conn, z: zipfile.ZipFile, board: dict, ids: list, name: str) -> int | None:

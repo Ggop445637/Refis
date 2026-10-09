@@ -221,3 +221,43 @@ def test_repeated_navigation_starts_one_transition(page):
     assert n == 1
     assert page.is_visible('.page[data-page="library"]')
     assert not page.errors, page.errors
+
+
+def test_create_folder_and_drag_cards_into_it(page, client):
+    from conftest import TMP
+    page.click("#mainNav [data-page=library]")
+    page.click("#addFolder")
+    page.click("#ctxmenu button:has-text('Создать новую папку')")
+    page.wait_for_function("document.activeElement?.id === 'nName'")  # окно открылось и поставило фокус
+    page.fill("#nName", "Перетащить сюда")
+    page.select_option("#nWhere", "new")
+    page.fill("#nParent", str(TMP / "ui-made"))
+    page.click("#nOk")
+    page.wait_for_function("document.querySelector('#toasts').innerText.includes('Перетащить сюда')", timeout=15000)
+    root = TMP / "ui-made" / "Перетащить сюда"
+    import os
+    assert root.is_dir(), (os.listdir(TMP / "ui-made"), [f["path"] for f in client.get("/api/folders").json()])
+    fid = next(f["id"] for f in client.get("/api/folders").json() if f["path"] == str(root))
+
+    page.locator(f'#folderlist li[data-id="{fid}"][data-sub=""]').click(button="right")
+    page.click("#ctxmenu button:has-text('Новая подпапка')")
+    page.wait_for_function("document.activeElement?.id === 'nName'")
+    page.fill("#nName", "Руки")
+    page.click("#nOk")
+    page.wait_for_function("document.querySelector('#toasts').innerText.includes('Папка создана: Руки')", timeout=15000)
+    page.wait_for_timeout(500)
+    assert (root / "Руки").is_dir()
+    sub = page.locator(f'#folderlist li[data-id="{fid}"][data-sub="Руки"]')
+    assert sub.is_visible() and "active" in sub.get_attribute("class")
+
+    sub.click()  # снять фильтр по папке
+    page.fill("#search", "pose_b")
+    page.wait_for_timeout(900)
+    page.locator(".card").first.drag_to(sub)
+    page.wait_for_timeout(1500)
+    assert (root / "Руки" / "pose_b.jpg").exists()
+    assert "Перемещено" in page.inner_text("#toasts")
+    assert page.locator(f'#folderlist li[data-id="{fid}"][data-sub="Руки"] .cnt').inner_text() == "1"
+    assert not page.is_visible("#dropzone")
+    assert not page.errors, page.errors
+    page.fill("#search", "")

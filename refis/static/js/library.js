@@ -8,12 +8,13 @@ import { openViewer } from "./viewer.js";
 import { practiceDialog } from "./practice.js";
 import { addToBoardDialog } from "./boards.js";
 import { exportPackDialog } from "./packs.js";
+import { renderFolders, moveDialog, DRAG_TYPE } from "./folders.js";
 
 const PAGE = 300;
 const GAP = 10;
 
 export const state = {
-  view: "all", folder: 0, tags: [], ntags: [], q: "", type: "", orient: "", minRating: 0, sort: "new",
+  view: "all", folder: 0, sub: "", tags: [], ntags: [], q: "", type: "", orient: "", minRating: 0, sort: "new",
   layout: "justified", thumb: 220,
   items: [], total: 0, loading: false,
   selected: new Set(), anchor: -1,
@@ -33,6 +34,7 @@ export function filterParams() {
   if (state.view === "dupes") p.set("dupes", "true");
   if (state.view === "missing") p.set("missing", "true");
   if (state.folder) p.set("folder", state.folder);
+  if (state.folder && state.sub) p.set("sub", state.sub);
   if (state.type) p.set("type", state.type);
   if (state.orient) p.set("orient", state.orient);
   if (state.minRating) p.set("min_rating", state.minRating);
@@ -97,6 +99,7 @@ function makeCard(it, i, animate) {
   const el = document.createElement("div");
   el.className = "card nomove" + (animate ? " enter" : "") + (state.selected.has(it.id) ? " sel" : "");
   el.dataset.id = it.id;
+  el.draggable = true; // на папку в боковой панели — переместить
   el.style.setProperty("--i", i);
   el.innerHTML = cardInner(it);
   return el;
@@ -282,6 +285,23 @@ grid.addEventListener("dblclick", (e) => {
   const card = e.target.closest(".card");
   if (card) view(+card.dataset.id);
 });
+grid.addEventListener("dragstart", (e) => {
+  const card = e.target.closest(".card");
+  if (!card) return;
+  const id = +card.dataset.id;
+  if (!state.selected.has(id)) select([id], state.items.findIndex((i) => i.id === id));
+  const ids = [...state.selected];
+  e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(ids));
+  e.dataTransfer.effectAllowed = "move";
+  const ghost = document.createElement("div");
+  ghost.className = "dragcount";
+  ghost.textContent = `📁 ${files(ids.length)}`;
+  document.body.appendChild(ghost);
+  e.dataTransfer.setDragImage(ghost, 20, 20);
+  setTimeout(() => ghost.remove(), 0);
+  document.body.classList.add("dragging-cards");
+});
+grid.addEventListener("dragend", () => document.body.classList.remove("dragging-cards"));
 grid.addEventListener("contextmenu", (e) => {
   const card = e.target.closest(".card");
   if (!card) return;
@@ -299,6 +319,7 @@ grid.addEventListener("contextmenu", (e) => {
     "-",
     [tr("На доску…"), () => addToBoardDialog(ids)],
     [tr("Тренировка по выбранным"), () => practiceDialog({ ids })],
+    [`📁 ${tr("Переместить в папку…")}`, () => moveDialog(ids)],
     [`📦 ${tr("Экспорт набора…")}`, () => exportPackDialog({ ids, name: one ? it.name : "" })],
     "-",
     [tr("В избранное"), () => bulk({ ids, favorite: true }), "F"],
@@ -450,7 +471,8 @@ export async function renderDetails() {
       ${m.type === "image" ? `<button id="dDraw" class="primary">⏱ ${tr("Рисовать")}</button><button id="dCopy">${tr("Копировать")}</button>` : ""}
       <button id="dBoard">＋ ${tr("Доска")}</button>
     </div>
-    <div class="row"><button id="dReveal">${tr("Показать в проводнике")}</button><button id="dOpen">${tr("Открыть в программе")}</button></div>
+    <div class="row"><button id="dReveal">${tr("Показать в проводнике")}</button><button id="dOpen">${tr("Открыть в программе")}</button>
+      ${m.missing ? "" : `<button id="dMove">📁 ${tr("Переместить…")}</button>`}</div>
     ${m.missing ? "" : `<div class="row"><button id="dTrash" class="danger" title="Delete">🗑 ${tr("Удалить в Корзину")}</button></div>`}
     <div class="meta">
       ${m.width ? `<span>${tr("Размер")}</span><span>${m.width}×${m.height}</span>` : ""}
@@ -502,6 +524,8 @@ export async function renderDetails() {
   $("#dReveal").onclick = () => api(`/media/${id}/reveal`, { method: "POST" });
   $("#dOpen").onclick = () => api(`/media/${id}/open`, { method: "POST" });
   $$(".dups li", d).forEach((li) => (li.onclick = () => api(`/media/${li.dataset.id}/reveal`, { method: "POST" })));
+  const mv = $("#dMove");
+  if (mv) mv.onclick = () => moveDialog([id]);
   const tb = $("#dTrash");
   if (tb) tb.onclick = () => trashMedia([id]);
   const f = $("#dForget");
@@ -525,8 +549,9 @@ function renderBulk(ids) {
     <div class="field"><label>${tr("Оценка")}</label>
       <div class="row stars">${[1, 2, 3, 4, 5].map((n) => `<button data-r="${n}">★</button>`).join("")}<button data-r="0" class="mini ghost">${tr("сброс")}</button></div></div>
     <div class="row"><button id="bFav">♥ ${tr("В избранное")}</button><button id="bUnfav">${tr("Убрать из избранного")}</button></div>
-    <div class="row"><button id="bPractice" class="primary">⏱ ${tr("Тренировка")}</button><button id="bBoard">＋ ${tr("На доску")}</button>
-      <button id="bPack" title="${tr("Один файл .refis — поделиться подборкой")}">📦 ${tr("Набор")}</button></div>
+    <div class="row"><button id="bPractice" class="primary">⏱ ${tr("Тренировка")}</button><button id="bBoard">＋ ${tr("На доску")}</button></div>
+    <div class="row"><button id="bPack" title="${tr("Один файл .refis — поделиться подборкой")}">📦 ${tr("Набор")}</button>
+      <button id="bMove" title="${tr("Или перетащите карточки на папку в боковой панели")}">📁 ${tr("Переместить…")}</button></div>
     <div class="row"><button id="bTrash" class="danger" title="Delete">🗑 ${tr("Удалить в Корзину")}</button>
       <button id="bForget" class="ghost" title="${tr("Файлы на диске останутся")}">${tr("Убрать из каталога")}</button></div>`;
   const add = $("#bAdd");
@@ -550,6 +575,7 @@ function renderBulk(ids) {
   $("#bUnfav").onclick = () => bulk({ ids, favorite: false });
   $("#bPractice").onclick = () => practiceDialog({ ids });
   $("#bBoard").onclick = () => addToBoardDialog(ids);
+  $("#bMove").onclick = () => moveDialog(ids);
   $("#bPack").onclick = () => exportPackDialog({ ids, name: state.tags.length === 1 ? state.tags[0] : "" });
   $("#bTrash").onclick = () => trashMedia(ids);
   $("#bForget").onclick = () => confirmDialog(
@@ -563,7 +589,7 @@ export async function bulk(body) {
   await reloadKeepSelection();
 }
 
-async function reloadKeepSelection() {
+export async function reloadKeepSelection() {
   const keep = new Set(state.selected);
   $("#details").dataset.stale = "1";
   await Promise.all([load(true), loadTags()]);
@@ -693,7 +719,7 @@ $("#views").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-view]");
   if (!b) return;
   setView(b.dataset.view);
-  state.folder = 0;
+  state.folder = 0; state.sub = "";
   renderFolders();
   emit("navigate", "library");
   load();
@@ -701,35 +727,11 @@ $("#views").addEventListener("click", (e) => {
 
 export async function loadFolders() {
   state.folders = await api("/folders");
-  renderFolders();
+  renderFolders(true);
   emit("folders-changed");
 }
-function renderFolders() {
-  $("#folderlist").innerHTML = state.folders.map((f) =>
-    `<li data-id="${f.id}" class="${state.folder === f.id ? "active" : ""}" title="${esc(f.path)}">
-      <i class="dot k-${f.kind}"></i><span class="name">${esc(f.path)}</span><span class="cnt">${f.count}</span></li>`).join("")
-    || `<li class="empty">${tr("Нажмите ＋, чтобы добавить")}</li>`;
-}
-$("#folderlist").addEventListener("click", (e) => {
-  const li = e.target.closest("li[data-id]");
-  if (!li) return;
-  const id = +li.dataset.id;
-  state.folder = state.folder === id ? 0 : id;
-  renderFolders();
-  emit("navigate", "library");
-  load();
-});
-$("#folderlist").addEventListener("contextmenu", (e) => {
-  const li = e.target.closest("li[data-id]");
-  if (!li) return;
-  e.preventDefault();
-  const f = state.folders.find((x) => x.id === +li.dataset.id);
-  menu(e, [
-    [tr("Настройки папки…"), () => folderSettings(f)],
-    [tr("Пересканировать"), async () => { await api(`/folders/${f.id}/scan`, { method: "POST" }); emit("poll"); }],
-  ]);
-});
-$("#addFolder").onclick = () => folderDialog();
+// дерево папок, создание и перемещение — в folders.js
+export function folderSettingsDialog(f) { folderSettings(f); }
 
 // ---------- сохранённые поиски
 
@@ -748,11 +750,11 @@ export async function loadSaved() {
   });
 }
 function currentQuery() {
-  const { view, folder, tags, ntags, q, type, orient, minRating, sort } = state;
-  return { view, folder, tags, ntags, q, type, orient, minRating, sort };
+  const { view, folder, sub, tags, ntags, q, type, orient, minRating, sort } = state;
+  return { view, folder, sub, tags, ntags, q, type, orient, minRating, sort };
 }
 export function applyQuery(q) {
-  Object.assign(state, { view: "all", folder: 0, tags: [], ntags: [], q: "", type: "", orient: "", minRating: 0, sort: "new" }, q);
+  Object.assign(state, { view: "all", folder: 0, sub: "", tags: [], ntags: [], q: "", type: "", orient: "", minRating: 0, sort: "new" }, q);
   setView(state.view);
   syncControls();
   renderTags();
@@ -783,7 +785,7 @@ function renderChips() {
   state.ntags.forEach((t) => chips.push(`<span class="chip exc">−#${esc(t)}<button data-rm-ntag="${esc(t)}">×</button></span>`));
   if (state.folder) {
     const f = state.folders.find((x) => x.id === state.folder);
-    if (f) chips.push(`<span class="chip">📁 ${esc(f.path.split(/[\\/]/).pop())}<button data-rm-folder>×</button></span>`);
+    if (f) chips.push(`<span class="chip">📁 ${esc([f.path.split(/[\\/]/).pop(), state.sub].filter(Boolean).join("/"))}<button data-rm-folder>×</button></span>`);
   }
   if (chips.length > 1) chips.push(`<button class="mini ghost" data-rm-all>${tr("Сбросить всё")}</button>`);
   const html = chips.join("");
@@ -794,8 +796,8 @@ $("#chips").addEventListener("click", (e) => {
   if (!b) return;
   if (b.dataset.rmTag !== undefined) state.tags = state.tags.filter((t) => t !== b.dataset.rmTag);
   if (b.dataset.rmNtag !== undefined) state.ntags = state.ntags.filter((t) => t !== b.dataset.rmNtag);
-  if (b.dataset.rmFolder !== undefined) state.folder = 0;
-  if (b.dataset.rmAll !== undefined) { state.tags = []; state.ntags = []; state.folder = 0; }
+  if (b.dataset.rmFolder !== undefined) { state.folder = 0; state.sub = ""; }
+  if (b.dataset.rmAll !== undefined) { state.tags = []; state.ntags = []; state.folder = 0; state.sub = ""; }
   renderTags(); renderFolders(); load();
 });
 
@@ -877,7 +879,7 @@ function folderSettings(f) {
       };
       $("#sDel", box).onclick = () => confirmDialog(tr("Убрать папку из Refis?"),
         tr("Теги, оценки и заметки файлов этой папки будут удалены из каталога. Сами файлы на диске НЕ удаляются."),
-        async () => { await api(`/folders/${f.id}`, { method: "DELETE" }); state.folder = 0; await Promise.all([loadFolders(), loadTags()]); load(); }, tr("Убрать"));
+        async () => { await api(`/folders/${f.id}`, { method: "DELETE" }); state.folder = 0; state.sub = ""; await Promise.all([loadFolders(), loadTags()]); load(); }, tr("Убрать"));
     });
 }
 

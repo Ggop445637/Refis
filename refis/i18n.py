@@ -102,4 +102,6 @@ EN = {
     "Это не набор Refis": "This is not a Refis pack", "Описание набора повреждено": "The pack description is damaged",
     "Набор создан в более новой версии Refis — обновите приложение": "The pack was made in a newer Refis — please update the app",
     "Набор не найден — откройте файл ещё раз": "Pack not found — open the file again",
+    "Идёт сканирование — попробуйте через минуту": "A scan is running — try again in a minute",
+    "Не удалось создать папку: {err}": "Couldn't create the folder: {err}",
 }

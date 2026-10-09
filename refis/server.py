@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .i18n import tr
-from . import __version__, db, media, organize, packs, pinterest, profile, security, system
+from . import __version__, db, folders as folders_mod, media, organize, packs, pinterest, profile, security, system
 
 STATIC = Path(__file__).resolve().parent / "static"
 
@@ -148,20 +148,11 @@ def folders():
 
 @app.post("/api/folders")
 def add_folder(f: FolderIn):
-    path = os.path.abspath(os.path.expanduser(f.path.strip().strip('"')))
-    if not os.path.isdir(path):
-        raise HTTPException(400, tr("Папка не найдена: {path}", path=path))
-    if f.kind not in db.KINDS:
-        raise HTTPException(400, tr("Неизвестный тип"))
     conn = db.connect()
-    for r in conn.execute("SELECT path FROM folders"):
-        a, b = os.path.normcase(r["path"]), os.path.normcase(path)
-        if a == b or b.startswith(a + os.sep) or a.startswith(b + os.sep):
-            raise HTTPException(400, tr("Пересекается с уже добавленной папкой: {path}", path=r["path"]))
-    fid = conn.execute("INSERT INTO folders(path, kind, auto_tags) VALUES (?,?,?)",
-                       (path, f.kind, int(f.auto_tags))).lastrowid
+    fid = folders_mod.register_folder(conn, f.path, f.kind, scan=False)
+    conn.execute("UPDATE folders SET auto_tags = ? WHERE id = ?", (int(f.auto_tags), fid))
     threading.Thread(target=media.scan_folder, args=(fid,), daemon=True).start()
-    return {"id": fid, "path": path}
+    return {"id": fid, "path": conn.execute("SELECT path FROM folders WHERE id = ?", (fid,)).fetchone()[0]}
 
 
 @app.patch("/api/folders/{fid}")
@@ -205,7 +196,7 @@ def scan_everything():
 # ---------------------------------------------------------------- media
 
 @app.get("/api/media")
-def list_media(q: str = "", kind: str = "", type: str = "", folder: int = 0, fav: bool = False,
+def list_media(q: str = "", kind: str = "", type: str = "", folder: int = 0, sub: str = "", fav: bool = False,
                untagged: bool = False, dupes: bool = False, missing: bool = False, orient: str = "",
                min_rating: int = 0, tags: str = "", ntags: str = "", sort: str = "new", offset: int = 0, limit: int = 300):
     conn = db.connect()
@@ -218,7 +209,13 @@ def list_media(q: str = "", kind: str = "", type: str = "", folder: int = 0, fav
         where.append("m.kind = ?"); args.append(kind)
     if type in ("image", "video"):
         where.append("m.type = ?"); args.append(type)
-    if folder:
+    if folder and sub.strip():
+        f = conn.execute("SELECT * FROM folders WHERE id = ?", (folder,)).fetchone()
+        if f:
+            c, a = folders_mod.under_clause(f, sub); where.append(c); args += a
+        else:
+            where.append("0")
+    elif folder:
         where.append("m.folder_id = ?"); args.append(folder)
     if fav:
         where.append("m.favorite = 1")
@@ -777,4 +774,5 @@ app.include_router(system.router)
 app.include_router(profile.router)
 app.include_router(pinterest.router)
 app.include_router(packs.router)
+app.include_router(folders_mod.router)
 app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")
