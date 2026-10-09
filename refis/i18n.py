@@ -97,4 +97,9 @@ EN = {
     "Это не резервная копия Refis (нет refis.db)": "This is not a Refis backup (no refis.db)",
     "Файл базы в копии повреждён": "The database file in the backup is damaged",
     "Недопустимые пути в архиве": "The archive contains invalid paths", "Файл не является zip-архивом": "The file is not a zip archive",
+    "Кадры": "Frames", "кадр": "frame", "Не удалось сохранить кадр": "Couldn't save the frame",
+    "Наборы": "Packs", "Набор": "Pack", "В наборе нет файлов": "The pack has no files",
+    "Это не набор Refis": "This is not a Refis pack", "Описание набора повреждено": "The pack description is damaged",
+    "Набор создан в более новой версии Refis — обновите приложение": "The pack was made in a newer Refis — please update the app",
+    "Набор не найден — откройте файл ещё раз": "Pack not found — open the file again",
 }

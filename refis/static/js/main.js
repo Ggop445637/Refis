@@ -13,6 +13,7 @@ import { renderOrganize, openTriage, triageOpen, triageKey, updateBadge } from "
 import { renderPinterest, updatePinBadge } from "./pinboard.js";
 import { loadSettings, renderSettings, checkUpdatesOnStart, settings as appSettings } from "./settings.js";
 import { renderProfile } from "./profile.js";
+import { openPackFile, importPack, isPackFile } from "./packs.js";
 
 let page = null;
 let libLoaded = false;
@@ -126,6 +127,7 @@ function commands() {
     { g: tr("Действия"), ic: "🏷", t: tr("Быстрая разметка файлов без тегов"), run: () => openTriage() },
     { g: tr("Действия"), ic: "⏱", t: tr("Тренировка набросков"), run: () => { go("library"); practiceDialog({ params: filterParams(), total: lib.total }); } },
     { g: tr("Действия"), ic: "◫", t: tr("Новая доска"), run: () => createBoard() },
+    { g: tr("Действия"), ic: "📦", t: tr("Открыть набор референсов (.refis)…"), run: openPackFile },
     { g: tr("Действия"), ic: "＋", t: tr("Добавить папку"), run: () => folderDialog() },
     { g: tr("Действия"), ic: "⟳", t: tr("Пересканировать все папки"), run: async () => { await api("/scan", { method: "POST" }); poll(); toast(tr("Сканирую…")); } },
     { g: tr("Действия"), ic: "◨", t: tr("Показать/скрыть панель деталей"), run: () => { go("library"); toggleDetails(); }, k: "I" },
@@ -245,6 +247,8 @@ addEventListener("drop", (e) => {
   e.preventDefault();
   dragDepth = 0;
   $("#dropzone").hidden = true;
+  const pack = [...e.dataTransfer.files].find(isPackFile);
+  if (pack) return importPack(pack);
   if (page === "board") return boardDrop(e);
   const list = [...e.dataTransfer.files].filter((f) => /\.(jpe?g|jfif|png|gif|webp|bmp|tiff?|psd|mp4|webm|mov|m4v|mkv|avi|wmv|flv|mpe?g)$/i.test(f.name));
   if (!list.length) return toast(tr("Здесь нет картинок или видео"));

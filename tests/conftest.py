@@ -94,3 +94,15 @@ def wait_scan(client, total, timeout=15):
             return
         time.sleep(0.1)
     raise AssertionError("сканирование не закончилось")
+
+
+def make_video(path: Path, seconds: int = 3) -> Path:
+    """Короткое webm-видео (его играет и Chromium в UI-тестах)."""
+    import subprocess
+
+    import imageio_ffmpeg
+    path.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-v", "error", "-y", "-f", "lavfi",
+                    "-i", f"testsrc=duration={seconds}:size=320x240:rate=10", "-c:v", "libvpx", "-b:v", "200k", str(path)],
+                   check=True)
+    return path

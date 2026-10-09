@@ -33,6 +33,8 @@ def test_trash_moves_files_and_forgets_them(client, monkeypatch):
     gone, locked = items["gone"]["id"], items["locked"]["id"]
     client.post("/api/media/bulk", json={"ids": [gone, locked], "add_tags": ["на-удаление"]})
     client.get(f"/api/thumb/{gone}")
+    bid = client.post("/api/boards", json={"name": "t", "data": {"items": [
+        {"id": "x", "type": "media", "mid": gone, "src": f"/api/file/{gone}"}, {"id": "n", "type": "note", "text": "hi"}]}}).json()["id"]
 
     r = client.post("/api/media/trash", json={"ids": [gone, locked, 999999]}).json()
     assert r["ids"] == [gone]
@@ -42,6 +44,8 @@ def test_trash_moves_files_and_forgets_them(client, monkeypatch):
     assert client.get(f"/api/media/{gone}").status_code == 404
     assert not media.thumb_path(gone).exists()
     assert client.get(f"/api/media/{locked}").json()["tags"] == ["на-удаление"]
+    assert [i["id"] for i in client.get(f"/api/boards/{bid}").json()["data"]["items"]] == ["n"]
+    client.delete(f"/api/boards/{bid}")
 
     # пересканирование не возвращает удалённое
     client.post("/api/scan")

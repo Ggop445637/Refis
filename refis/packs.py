@@ -1,0 +1,355 @@
+"""Наборы референсов: подборка или доска в одном файле .refis, которым можно поделиться.
+
+Файл — обычный zip:
+  refis-pack.json   описание: название, автор, файлы с тегами и заметками, доска (если есть)
+  files/…           сами картинки и видео
+  assets/…          картинки, вставленные прямо на доску
+"""
+import io
+import json
+import os
+import re
+import shutil
+import time
+import uuid
+import zipfile
+from pathlib import Path
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import Response
+from PIL import Image, ImageOps
+from pydantic import BaseModel
+
+from . import __version__, db, media
+from .i18n import tr
+
+router = APIRouter(prefix="/api/packs")
+
+MANIFEST = "refis-pack.json"
+FORMAT = 1
+EXT = ".refis"
+INBOX = db.DATA_DIR / "pack-inbox"
+_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
+_ASSET_SRC = re.compile(r"^/api/board-assets/([0-9a-f]{32}\.(?:png|jpe?g|gif|webp|bmp))$")
+_PACKED = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".jfif"} | media.VIDEO_EXT  # уже сжаты — не тратим время
+
+
+def packs_dir() -> Path:
+    from .system import documents_dir
+    return documents_dir() / tr("Наборы")
+
+
+# ======================================================================= экспорт
+
+class ExportIn(BaseModel):
+    name: str
+    author: str = ""
+    description: str = ""
+    ids: list[int] = []
+    board_id: int | None = None
+    tag: str = ""      # все файлы с тегом
+    notes: bool = True  # заметки бывают личными — можно не включать
+
+
+def _board(bid: int | None) -> dict | None:
+    if not bid:
+        return None
+    r = db.connect().execute("SELECT name, data FROM boards WHERE id = ?", (bid,)).fetchone()
+    if not r:
+        raise HTTPException(404, tr("Доска не найдена"))
+    return {"name": r["name"], "data": json.loads(r["data"])}
+
+
+def _collect(ids: list[int], board: dict | None, tag: str = "") -> list:
+    """Файлы набора по порядку, без повторов и без пропавших с диска."""
+    conn = db.connect()
+    by_tag = [r[0] for r in conn.execute(
+        "SELECT mt.media_id FROM media_tags mt JOIN tags t ON t.id = mt.tag_id JOIN media m ON m.id = mt.media_id"
+        " WHERE t.name = ? ORDER BY m.added_at", (db.normalize_tag(tag),))] if tag.strip() else []
+    order = list(dict.fromkeys(
+        [i["mid"] for i in (board or {}).get("data", {}).get("items", []) if i.get("type") == "media" and i.get("mid")]
+        + ids + by_tag))
+    rows = {}
+    for k in range(0, len(order), 900):
+        part = order[k:k + 900]
+        rows.update((r["id"], r) for r in conn.execute(f"SELECT * FROM media WHERE id IN ({','.join('?' * len(part))})", part))
+    return [rows[i] for i in order if i in rows and not rows[i]["missing"] and os.path.exists(rows[i]["path"])]
+
+
+class EstimateIn(BaseModel):
+    ids: list[int] = []
+    board_id: int | None = None
+    tag: str = ""
+
+
+@router.post("/estimate")
+def estimate(b: EstimateIn):
+    rows = _collect(b.ids, _board(b.board_id), b.tag)
+    return {"count": len(rows), "size": sum(r["size"] for r in rows),
+            "videos": sum(r["type"] == "video" for r in rows)}
+
+
+def _tags_of(conn, mid: int) -> list[str]:
+    return [r[0] for r in conn.execute(
+        "SELECT t.name FROM tags t JOIN media_tags mt ON mt.tag_id = t.id WHERE mt.media_id = ? ORDER BY t.name", (mid,))]
+
+
+def build_pack(e: ExportIn, out: Path) -> dict:
+    board = _board(e.board_id)
+    rows = _collect(e.ids, board, e.tag)
+    if not rows:
+        raise HTTPException(400, tr("В наборе нет файлов"))
+    conn = db.connect()
+    items, index, used = [], {}, set()
+    for n, r in enumerate(rows):
+        base = media.safe_name(os.path.basename(r["path"]))
+        arc = f"files/{base}"
+        while arc.lower() in used:
+            arc = f"files/{n}_{base}"
+        used.add(arc.lower())
+        index[r["id"]] = len(items)
+        items.append({"file": arc, "name": r["name"], "type": r["type"], "kind": r["kind"], "tags": _tags_of(conn, r["id"]),
+                      "source": r["source"], "notes": r["notes"] if e.notes else "", "rating": r["rating"],
+                      "_path": r["path"]})
+    pack_board, assets = None, []
+    if board:
+        b_items = []
+        for it in board["data"].get("items", []):
+            it = {k: v for k, v in it.items() if not k.startswith("_")}
+            if it.get("type") == "media":
+                if it.get("mid") not in index:
+                    continue
+                it["item"] = index[it.pop("mid")]
+                it.pop("src", None)
+            elif it.get("type") == "asset":
+                m = _ASSET_SRC.match(it.get("src", ""))
+                if not m or not (db.ASSET_DIR / m.group(1)).exists():
+                    continue
+                assets.append(m.group(1))
+                it["src"] = f"assets/{m.group(1)}"
+            b_items.append(it)
+        pack_board = {"name": board["name"], "items": b_items, "view": board["data"].get("view")}
+    manifest = {"format": FORMAT, "app": f"Refis {__version__}", "name": e.name.strip() or tr("Набор"),
+                "author": e.author.strip(), "description": e.description.strip(), "created": time.time(),
+                "items": [{k: v for k, v in i.items() if k != "_path"} for i in items], "board": pack_board}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_suffix(".part")
+    try:
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr(MANIFEST, json.dumps(manifest, ensure_ascii=False, indent=1))
+            for i in items:
+                packed = os.path.splitext(i["_path"])[1].lower() in _PACKED
+                z.write(i["_path"], i["file"], zipfile.ZIP_STORED if packed else zipfile.ZIP_DEFLATED)
+            for a in dict.fromkeys(assets):
+                z.write(db.ASSET_DIR / a, f"assets/{a}", zipfile.ZIP_STORED)
+        tmp.replace(out)
+    finally:
+        tmp.unlink(missing_ok=True)
+    return {"path": str(out), "size": out.stat().st_size, "count": len(items)}
+
+
+@router.post("/export")
+def export(e: ExportIn):
+    base = media.safe_name(e.name.strip() or tr("Набор"))
+    out, n = packs_dir() / f"{base}{EXT}", 1
+    while out.exists():
+        out = packs_dir() / f"{base} ({n}){EXT}"; n += 1
+    return build_pack(e, out)
+
+
+class PathIn(BaseModel):
+    path: str
+
+
+@router.post("/reveal")
+def reveal(p: PathIn):
+    path = Path(p.path).resolve()
+    if path.suffix != EXT or path.parent != packs_dir().resolve() or not path.exists():
+        raise HTTPException(400)
+    from .server import _reveal
+    _reveal(str(path))
+    return {"ok": True}
+
+
+# ======================================================================= импорт
+
+def read_manifest(z: zipfile.ZipFile) -> dict:
+    try:
+        m = json.loads(z.read(MANIFEST))
+    except KeyError:
+        raise HTTPException(400, tr("Это не набор Refis"))
+    except ValueError:
+        raise HTTPException(400, tr("Описание набора повреждено"))
+    if not isinstance(m, dict) or not isinstance(m.get("items"), list):
+        raise HTTPException(400, tr("Описание набора повреждено"))
+    if m.get("format", 1) > FORMAT:
+        raise HTTPException(400, tr("Набор создан в более новой версии Refis — обновите приложение"))
+    names = set(z.namelist())
+    # только файлы, которые действительно есть в архиве и похожи на картинку или видео
+    m["items"] = [i for i in m["items"] if isinstance(i, dict) and i.get("file") in names and media.media_type(i["file"])]
+    return m
+
+
+def _inbox(token: str) -> Path:
+    p = INBOX / f"{token}{EXT}"
+    if not _TOKEN_RE.match(token) or not p.exists():
+        raise HTTPException(404, tr("Набор не найден — откройте файл ещё раз"))
+    return p
+
+
+def clean_inbox(max_age: float = 86400) -> None:
+    for f in INBOX.glob("*" + EXT):
+        if time.time() - f.stat().st_mtime > max_age:
+            f.unlink(missing_ok=True)
+
+
+@router.post("/inspect")
+def inspect(file: UploadFile = File(...)):
+    INBOX.mkdir(parents=True, exist_ok=True)
+    clean_inbox()
+    token = uuid.uuid4().hex
+    path = INBOX / f"{token}{EXT}"
+    with open(path, "wb") as out:
+        while chunk := file.file.read(1 << 20):
+            out.write(chunk)
+    try:
+        with zipfile.ZipFile(path) as z:
+            m = read_manifest(z)
+            sizes = {i.filename: i.file_size for i in z.infolist()}
+    except zipfile.BadZipFile:
+        path.unlink(missing_ok=True)
+        raise HTTPException(400, tr("Это не набор Refis"))
+    except HTTPException:
+        path.unlink(missing_ok=True)
+        raise
+    items = m["items"]
+    tags: dict[str, int] = {}
+    for i in items:
+        for t in i.get("tags") or []:
+            tags[t] = tags.get(t, 0) + 1
+    if not items:
+        path.unlink(missing_ok=True)
+        raise HTTPException(400, tr("В наборе нет файлов"))
+    return {
+        "token": token, "name": str(m.get("name") or tr("Набор"))[:120], "author": str(m.get("author") or "")[:120],
+        "description": str(m.get("description") or "")[:2000], "count": len(items),
+        "videos": sum(media.media_type(i["file"]) == "video" for i in items),
+        "size": sum(sizes.get(i["file"], 0) for i in items), "board": bool(m.get("board")),
+        "tags": [t for t, _ in sorted(tags.items(), key=lambda x: -x[1])[:12]],
+        "preview": [n for n, i in enumerate(items) if media.media_type(i["file"]) == "image"][:12],
+    }
+
+
+@router.get("/inbox/{token}/preview/{n}")
+def preview(token: str, n: int):
+    with zipfile.ZipFile(_inbox(token)) as z:
+        items = read_manifest(z)["items"]
+        if not 0 <= n < len(items):
+            raise HTTPException(404)
+        try:
+            im = Image.open(io.BytesIO(z.read(items[n]["file"])))
+            im.draft("RGB", (480, 480))
+            im = ImageOps.exif_transpose(im).convert("RGB")
+            im.thumbnail((360, 360))
+        except Exception:
+            raise HTTPException(404)
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=82)
+    return Response(buf.getvalue(), media_type="image/jpeg")
+
+
+class ImportIn(BaseModel):
+    token: str
+    folder_id: int
+    subdir: str = ""
+    tag: str = ""          # общий тег для всего набора, например «набор/анатомия»
+    board: bool = True     # создать доску, если она есть в наборе
+
+
+def _existing(conn, path: str) -> int | None:
+    """Такой же файл уже есть в библиотеке — не кладём второй экземпляр."""
+    size = os.path.getsize(path)
+    qh = media.quick_hash(path, size)
+    r = conn.execute("SELECT id FROM media WHERE qhash = ? AND size = ? AND missing = 0", (qh, size)).fetchone()
+    return r["id"] if r else None
+
+
+@router.post("/import")
+def import_pack(b: ImportIn):
+    src = _inbox(b.token)
+    conn = db.connect()
+    folder = conn.execute("SELECT * FROM folders WHERE id = ?", (b.folder_id,)).fetchone()
+    if not folder:
+        raise HTTPException(400, tr("Папка не найдена"))
+    with zipfile.ZipFile(src) as z:
+        m = read_manifest(z)
+        name = str(m.get("name") or tr("Набор"))[:120]
+        dest = media.target_dir(folder["path"], b.subdir.strip() or name)
+        common = db.normalize_tag(b.tag)
+        added, existing, ids = [], [], []
+        for it in m["items"]:
+            target = media.unique_path(dest, os.path.basename(it["file"]))
+            with z.open(it["file"]) as f, open(target, "wb") as out:
+                shutil.copyfileobj(f, out, 1 << 20)
+            tags = [t for t in (it.get("tags") or []) if isinstance(t, str)] + ([common] if common else [])
+            mid = _existing(conn, target)
+            if mid:
+                os.remove(target)
+                existing.append(mid)
+                for t in {db.normalize_tag(t) for t in tags} - {""}:
+                    conn.execute("INSERT OR IGNORE INTO media_tags VALUES (?, ?)", (mid, db.tag_id(conn, t)))
+            else:
+                kind = it.get("kind")
+                kind = "ref" if kind == "own" else kind  # чужие работы для нас — референсы
+                mid = media.register_file(conn, folder, target, kind if kind in db.KINDS else "", tags,
+                                          str(it.get("source") or "")[:500])
+                if mid is None:
+                    os.remove(target)
+                    ids.append(None)
+                    continue
+                rating = it.get("rating") if isinstance(it.get("rating"), int) else 0
+                conn.execute("UPDATE media SET notes = ?, rating = ? WHERE id = ?",
+                             (str(it.get("notes") or "")[:5000], max(0, min(5, rating)), mid))
+                added.append(mid)
+            ids.append(mid)
+        board_id = None
+        if b.board and isinstance(m.get("board"), dict):
+            board_id = _import_board(conn, z, m["board"], ids, name)
+    src.unlink(missing_ok=True)
+    media.thumbs.kick()
+    return {"added": added, "existing": existing, "board_id": board_id, "name": name}
+
+
+def _import_board(conn, z: zipfile.ZipFile, board: dict, ids: list, name: str) -> int | None:
+    names = set(z.namelist())
+    items, assets = [], {}
+    for it in board.get("items") or []:
+        if not isinstance(it, dict):
+            continue
+        it = dict(it)
+        if it.get("type") == "media":
+            n = it.pop("item", None)
+            if not isinstance(n, int) or not 0 <= n < len(ids) or ids[n] is None:
+                continue
+            row = conn.execute("SELECT id, type FROM media WHERE id = ?", (ids[n],)).fetchone()
+            it.update(mid=row["id"], mtype=row["type"], src=f"/api/file/{row['id']}")
+        elif it.get("type") == "asset":
+            arc = it.get("src")
+            m = re.match(r"^assets/[0-9a-f]{32}\.(png|jpe?g|gif|webp|bmp)$", str(arc))
+            if not m or arc not in names:
+                continue
+            if arc not in assets:
+                fname = f"{uuid.uuid4().hex}.{m.group(1)}"
+                with z.open(arc) as f, open(db.ASSET_DIR / fname, "wb") as out:
+                    shutil.copyfileobj(f, out)
+                assets[arc] = f"/api/board-assets/{fname}"
+            it["src"] = assets[arc]
+        elif it.get("type") != "note":
+            continue
+        items.append(it)
+    if not items:
+        return None
+    now = time.time()
+    data = {"items": items, "view": board.get("view") if isinstance(board.get("view"), dict) else None}
+    return conn.execute("INSERT INTO boards(name, data, created_at, updated_at) VALUES (?,?,?,?)",
+                        (str(board.get("name") or name)[:120], json.dumps(data, ensure_ascii=False), now, now)).lastrowid

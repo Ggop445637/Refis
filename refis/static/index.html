@@ -175,6 +175,8 @@
         <option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option>
       </select>
       <button data-act="loop" class="vid-only" title="Повтор (L)">↻</button>
+      <button data-act="ab" class="vid-only" title="Повтор отрезка A–B (X)">A–B</button>
+      <button data-act="frame" class="vid-only" title="Сохранить кадр в библиотеку (K)">📷 Кадр</button>
       <span class="vsep"></span>
       <button data-act="fav" title="В избранное (F)">☆</button>
       <button data-act="board" title="На доску">＋ Доска</button>
@@ -187,7 +189,7 @@
   <div class="vpalette chrome swatches" id="vPalette"></div>
   <div class="vbar chrome vid-only">
     <button id="vPlay" title="Пауза (Пробел)">❚❚</button>
-    <input id="vSeek" type="range" min="0" max="1000" value="0" step="1">
+    <div class="vseek"><input id="vSeek" type="range" min="0" max="1000" value="0" step="1"><i id="vAB" hidden></i></div>
     <span id="vTime">0:00 / 0:00</span>
     <button id="vMute" title="Звук (M)">🔊</button>
   </div>

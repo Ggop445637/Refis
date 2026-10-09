@@ -139,3 +139,67 @@ def test_delete_from_viewer_moves_to_next(page, client, monkeypatch):
     assert not page.errors, page.errors
     page.fill("#search", "")
     client.delete(f"/api/folders/{folder['id']}")
+
+
+def test_video_frame_and_ab_loop(page, client):
+    page.click("#mainNav [data-page=library]")
+    page.fill("#search", "урок_торс")
+    page.wait_for_timeout(900)
+    before = page.locator(".card").count()
+    vid = next(m["id"] for m in client.get("/api/media", params={"q": "урок_торс", "type": "video"}).json()["items"])
+    page.locator(f'.card[data-id="{vid}"]').dblclick()
+    page.wait_for_function("document.querySelector('#vStage video')?.readyState >= 2", timeout=10000)
+    video = "document.querySelector('#vStage video')"
+    page.evaluate(f"{video}.muted = true; {video}.pause(); {video}.currentTime = 0.5")
+    page.wait_for_timeout(300)
+    page.keyboard.press("x")
+    page.evaluate(f"{video}.currentTime = 1.5")
+    page.wait_for_timeout(300)
+    page.keyboard.press("x")
+    assert page.is_visible("#vAB") and "✓" in page.inner_text('[data-act="ab"]')
+    page.wait_for_timeout(2500)  # дольше отрезка — значит, видео вернулось к A
+    t = page.evaluate(f"{video}.currentTime")
+    assert 0.4 <= t <= 1.7, t
+    page.keyboard.press("k")
+    page.wait_for_timeout(1500)
+    assert "Кадр сохранён" in page.inner_text("#toasts")
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(800)
+    assert page.locator(".card").count() == before + 1
+    assert not page.errors, page.errors
+    page.fill("#search", "")
+
+
+def test_pack_export_and_import_dialogs(page, client, monkeypatch):
+    from conftest import TMP
+    from refis import packs, server
+    out = TMP / "packs-ui"
+    monkeypatch.setattr(packs, "packs_dir", lambda: out)
+    monkeypatch.setattr(server, "_reveal", lambda p: None)
+    page.click("#mainNav [data-page=library]")
+    page.fill("#search", "pose_")
+    page.wait_for_timeout(900)
+    page.locator(".card").first.click()
+    page.keyboard.press("Control+a")
+    page.wait_for_timeout(300)
+    page.click("#bPack")
+    page.wait_for_selector("#kName")
+    page.fill("#kName", "Мои позы")
+    page.click("#kOk")
+    page.wait_for_timeout(1200)
+    pack = out / "Мои позы.refis"
+    assert pack.exists()
+
+    page.click("#mainNav [data-page=boards]")
+    page.wait_for_timeout(600)
+    with page.expect_file_chooser() as fc:
+        page.click("#bOpenPack")
+    fc.value.set_files(str(pack))
+    page.wait_for_selector(".packprev img")
+    assert "Мои позы" in page.inner_text("#modal h2")
+    page.click("#kOk")
+    page.wait_for_timeout(1500)
+    assert "Набор добавлен" in page.inner_text("#toasts")
+    assert page.is_visible('.page[data-page="library"]')
+    assert not page.errors, page.errors
+    page.fill("#search", "")

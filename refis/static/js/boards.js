@@ -5,6 +5,7 @@ import {
   fileUrl, thumbUrl, copyImage, clipboardImages, reduced, plural,
 } from "./util.js";
 import { openViewer } from "./viewer.js";
+import { exportPackDialog, openPackFile } from "./packs.js";
 
 const B = {
   id: null, name: "", items: [], view: { x: 0, y: 0, z: 1 },
@@ -18,7 +19,9 @@ let saveTimer = null;
 export async function renderBoards() {
   const root = $("#boards");
   const list = await api("/boards");
-  root.innerHTML = `<header class="rise"><h1>${tr("Доски")}</h1><button class="primary" id="bNew">＋ ${tr("Новая доска")}</button></header>
+  root.innerHTML = `<header class="rise"><h1>${tr("Доски")}</h1><span class="grow"></span>
+    <button id="bOpenPack" title="${tr("Добавить набор .refis, которым с вами поделились")}">📦 ${tr("Открыть набор…")}</button>
+    <button class="primary" id="bNew">＋ ${tr("Новая доска")}</button></header>
     <div class="bgrid">
       ${list.map((b, i) => `<div class="glass bcard" style="--i:${i}" data-id="${b.id}">
         <div class="prev n${Math.min(b.preview.length, 3)}">${b.preview.length ? b.preview.slice(0, 3).map((s) => `<img src="${esc(previewSrc(s))}" alt="" loading="lazy">`).join("") : tr('<div class="none">пусто</div>')}</div>
@@ -27,6 +30,7 @@ export async function renderBoards() {
       <div class="glass bcard new" style="--i:${list.length}" id="bNew2"><div><span class="plus">＋</span>${tr("Новая доска")}</div></div>
     </div>`;
   $("#bNew").onclick = $("#bNew2").onclick = () => createBoard();
+  $("#bOpenPack").onclick = openPackFile;
   $$(".bcard[data-id]", root).forEach((c) => {
     c.onclick = () => openBoard(+c.dataset.id);
     c.oncontextmenu = (e) => {
@@ -40,6 +44,7 @@ export async function renderBoards() {
           await api("/boards", { method: "POST", body: { name: b.name + tr(" (копия)"), data: full.data } });
           renderBoards();
         }],
+        [`📦 ${tr("Экспорт набора…")}`, () => exportPackDialog({ boardId: b.id, name: b.name })],
         "-",
         [tr("Удалить…"), () => confirmDialog(tr("Удалить доску?"), `«${b.name}» ${tr("исчезнет. Картинки в библиотеке останутся.")}`, async () => { await api(`/boards/${b.id}`, { method: "DELETE" }); renderBoards(); }, tr("Удалить"))],
       ]);
@@ -83,6 +88,7 @@ function buildEditor() {
       <button id="bFitBtn" title="${tr("Показать всё (F)")}">⤢ ${tr("Всё")}</button>
       <button id="bPin" title="${tr("Окно поверх всех — удобно рисовать рядом")}">📌 ${tr("Поверх окон")}</button>
       <button id="bExport" title="${tr("Сохранить доску картинкой")}">⬇ PNG</button>
+      <button id="bPack" title="${tr("Доска со всеми картинками одним файлом .refis — поделиться")}">📦 ${tr("Набор")}</button>
     </div>
     <div class="bwrap">
       <div class="bcanvas" id="bCanvas" tabindex="0">
@@ -107,6 +113,7 @@ function buildEditor() {
   $("#bPin").onclick = () => emit("toggle-pin");
   $("#bPin").hidden = !window.pywebview?.api;
   $("#bExport").onclick = exportPng;
+  $("#bPack").onclick = async () => { await flushSave(); exportPackDialog({ boardId: B.id, name: B.name }); };
   $("#bZi").onclick = () => zoomBy(1.25);
   $("#bZo").onclick = () => zoomBy(0.8);
   $("#bSearch").oninput = debounce(loadDrawer, 220);

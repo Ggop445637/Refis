@@ -450,7 +450,8 @@ body.details-hidden #details { width: 0; padding: 0; opacity: 0; border: 0; }
 .page[data-page=boards] { overflow-y: auto; display: none; }
 .page[data-page=boards].active { display: block; }
 .boards { max-width: 1240px; margin: 0 auto; padding: 34px 32px 60px; }
-.boards header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.boards header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.boards header .grow { flex: 1; }
 .boards header h1 { margin: 0; font-size: 30px; }
 .bgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
 .bcard { cursor: pointer; padding: 10px; transition: transform var(--t2) var(--ease-out), border-color var(--t2); animation: rise 600ms var(--ease-out) both; animation-delay: calc(var(--i) * 50ms); }
@@ -567,7 +568,12 @@ body.details-hidden #details { width: 0; padding: 0; opacity: 0; border: 0; }
   padding: 0 10px; z-index: 3; border-radius: 12px; background: rgba(20, 20, 28, .7); border: 1px solid var(--line); backdrop-filter: blur(12px);
 }
 .vbar button { background: none; border: 0; padding: 4px 8px; }
-#vSeek { flex: 1; }
+#vSeek { flex: 1; width: 100%; }
+.vseek { flex: 1; position: relative; display: flex; align-items: center; }
+#vAB { position: absolute; top: 50%; height: 14px; margin-top: -7px; min-width: 3px; border-radius: 4px; pointer-events: none;
+  background: color-mix(in srgb, var(--accent) 35%, transparent); border: 1px solid var(--accent); }
+.vbox.flash::after { content: ""; position: absolute; inset: 0; background: #fff; pointer-events: none; animation: vflash .45s ease-out forwards; }
+@keyframes vflash { from { opacity: .7; } to { opacity: 0; } }
 #vTime { color: var(--text-2); font-variant-numeric: tabular-nums; min-width: 120px; text-align: right; font-size: 12.5px; }
 .vpalette { position: absolute; left: 16px; bottom: 16px; z-index: 3; width: 240px; height: 24px; }
 #viewer.is-video .vpalette { display: none; }
@@ -691,7 +697,7 @@ canvas.confetti { position: fixed; inset: 0; pointer-events: none; z-index: 60; 
   :root { --sidebar: 210px; }
 }
 img, video { image-orientation: from-image; }
-#viewer.external [data-act="fav"], #viewer.external [data-act="board"] { display: none; }
+#viewer.external [data-act="fav"], #viewer.external [data-act="board"], #viewer.external [data-act="frame"] { display: none; }
 
 /* =====================================================================
    «Порядок», быстрая разметка, Pinterest
@@ -983,3 +989,7 @@ body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after 
 #sidebar { overflow-y: auto; }
 .sb-section.grow { min-height: 150px; }
 .hbar { grid-template-columns: 130px 1fr 92px; }
+
+/* ---------- наборы референсов */
+.packprev { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 4px 0 10px; }
+.packprev img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: var(--panel); }

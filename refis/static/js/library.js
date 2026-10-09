@@ -7,6 +7,7 @@ import {
 import { openViewer } from "./viewer.js";
 import { practiceDialog } from "./practice.js";
 import { addToBoardDialog } from "./boards.js";
+import { exportPackDialog } from "./packs.js";
 
 const PAGE = 300;
 const GAP = 10;
@@ -298,6 +299,7 @@ grid.addEventListener("contextmenu", (e) => {
     "-",
     [tr("На доску…"), () => addToBoardDialog(ids)],
     [tr("Тренировка по выбранным"), () => practiceDialog({ ids })],
+    [`📦 ${tr("Экспорт набора…")}`, () => exportPackDialog({ ids, name: one ? it.name : "" })],
     "-",
     [tr("В избранное"), () => bulk({ ids, favorite: true }), "F"],
     [tr("Убрать из избранного"), () => bulk({ ids, favorite: false })],
@@ -395,6 +397,7 @@ function view(id) {
     },
     onChange: (mid) => { updateCard(mid); refreshSelection(); },
     onTrash: (mid) => trashMedia([mid]),
+    onAdded: () => { load(true); loadTags(); }, // кадр из видео
   }, id, card);
 }
 
@@ -522,7 +525,8 @@ function renderBulk(ids) {
     <div class="field"><label>${tr("Оценка")}</label>
       <div class="row stars">${[1, 2, 3, 4, 5].map((n) => `<button data-r="${n}">★</button>`).join("")}<button data-r="0" class="mini ghost">${tr("сброс")}</button></div></div>
     <div class="row"><button id="bFav">♥ ${tr("В избранное")}</button><button id="bUnfav">${tr("Убрать из избранного")}</button></div>
-    <div class="row"><button id="bPractice" class="primary">⏱ ${tr("Тренировка")}</button><button id="bBoard">＋ ${tr("На доску")}</button></div>
+    <div class="row"><button id="bPractice" class="primary">⏱ ${tr("Тренировка")}</button><button id="bBoard">＋ ${tr("На доску")}</button>
+      <button id="bPack" title="${tr("Один файл .refis — поделиться подборкой")}">📦 ${tr("Набор")}</button></div>
     <div class="row"><button id="bTrash" class="danger" title="Delete">🗑 ${tr("Удалить в Корзину")}</button>
       <button id="bForget" class="ghost" title="${tr("Файлы на диске останутся")}">${tr("Убрать из каталога")}</button></div>`;
   const add = $("#bAdd");
@@ -546,6 +550,7 @@ function renderBulk(ids) {
   $("#bUnfav").onclick = () => bulk({ ids, favorite: false });
   $("#bPractice").onclick = () => practiceDialog({ ids });
   $("#bBoard").onclick = () => addToBoardDialog(ids);
+  $("#bPack").onclick = () => exportPackDialog({ ids, name: state.tags.length === 1 ? state.tags[0] : "" });
   $("#bTrash").onclick = () => trashMedia(ids);
   $("#bForget").onclick = () => confirmDialog(
     tr("Убрать из каталога?"),
@@ -669,6 +674,7 @@ $("#taglist").addEventListener("contextmenu", (e) => {
   menu(e, [
     [tr("Показать только его"), () => { state.tags = [tag]; state.ntags = []; renderTags(); emit("navigate", "library"); load(); }],
     [tr("Исключить из поиска"), () => toggleTag(tag, true), tr("Alt+клик")],
+    [`📦 ${tr("Экспорт набора…")}`, () => exportPackDialog({ tag, name: tag })],
     "-",
     [tr("Переименовать или объединить…"), () => promptDialog(tr("Переименовать тег"),
       tr("Если ввести имя существующего тега — теги объединятся. Вложенность через «/», например «анатомия/руки»."),

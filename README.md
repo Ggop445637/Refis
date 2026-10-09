@@ -60,7 +60,10 @@ Refis наводит порядок в папках с референсами, �
 - Удаление ненужного в Корзину Windows прямо из приложения (`Delete`).
 
 **Просмотр** — зеркало, ч/б, размытие для тональных пятен, сетка пропорций, поворот, пипетка;
-для видео — покадрово, скорость 0.1–2×, повтор.
+для видео — покадрово, скорость 0.1–2×, повтор отрезка A–B и сохранение кадра в библиотеку.
+
+**Наборы** — подборка, тег или доска одним файлом `.refis` с тегами и заметками: отправьте другу или выложите в канал,
+а получатель откроет его в Refis (перетащить в окно или «Доски → Открыть набор…»).
 
 **Доски** как в PureRef — бесконечный холст, картинки, видео и заметки, слои, «Упорядочить», отмена,
 экспорт в PNG и режим «Поверх всех окон», чтобы доска висела рядом с вашим редактором.
@@ -97,6 +100,7 @@ Refis наводит порядок в папках с референсами, �
 | Библиотека, просмотр | `Delete` | Удалить в Корзину |
 | Просмотр | `H` `G` `B` `S` `R` `I` | Зеркало, ч/б, пятна, сетка, поворот, пипетка |
 | Видео | `Пробел` `,` `.` `[` `]` `L` `M` | Пауза, кадр, скорость, повтор, звук |
+| Видео | `X` `K` | Повтор отрезка A–B, сохранить кадр в библиотеку |
 | Доска | `Ctrl+Z` `Ctrl+D` `A` `F` `N` `Delete` | Отмена, копия, упорядочить, показать всё, заметка, удалить |
 | Разметка | `1–9`, `Enter`, `Esc` | Подсказка, дальше, закончить |
 
@@ -136,6 +140,7 @@ python -m venv .venv
 **Refis** is a local, offline reference library for artists. It catalogs your folders of references, your own artworks
 and video tutorials (files stay where they are), helps you tag them quickly, and turns them into practice material:
 a reference of the day and “Draw this” challenges built from *your* topics, timed gesture sessions, PureRef-style boards,
+shareable reference packs (`.refis`), video tools (A–B loop, save a frame as a reference),
 a profile with stats and achievements, and Pinterest integration (collect pins from your home feed with a
 “＋ Refis” button, or follow public boards). Light/dark themes, English/Russian UI, no telemetry.
 

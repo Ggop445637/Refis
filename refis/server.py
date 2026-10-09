@@ -1,5 +1,6 @@
 """HTTP API + раздача интерфейса."""
 import datetime as dt
+import io
 import json
 import mimetypes
 import os
@@ -18,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .i18n import tr
-from . import __version__, db, media, organize, pinterest, profile, security, system
+from . import __version__, db, media, organize, packs, pinterest, profile, security, system
 
 STATIC = Path(__file__).resolve().parent / "static"
 
@@ -339,6 +340,13 @@ def _drop_media(conn, ids: list[int]) -> None:
     """Убирает записи из каталога вместе с превью; пины с Pinterest больше не ссылаются на них."""
     conn.executemany("DELETE FROM media WHERE id = ?", [(i,) for i in ids])
     conn.executemany("UPDATE pins SET status = 'hidden', media_id = NULL WHERE media_id = ?", [(i,) for i in ids])
+    gone = set(ids)
+    for r in conn.execute("SELECT id, data FROM boards").fetchall():  # и с досок, чтобы не было пустых рамок
+        data = json.loads(r["data"])
+        items = [i for i in data.get("items", []) if not (i.get("type") == "media" and i.get("mid") in gone)]
+        if len(items) != len(data.get("items", [])):
+            data["items"] = items
+            conn.execute("UPDATE boards SET data = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), r["id"]))
     for i in ids:
         media.thumb_path(i).unlink(missing_ok=True)
 
@@ -369,6 +377,36 @@ def trash(b: Ids):
         db.cleanup_tags(conn)
         conn.execute("COMMIT")
     return {"ids": done, "failed": failed}
+
+
+@app.post("/api/media/{mid}/frame")
+def save_frame(mid: int, file: UploadFile = File(...), t: float = Form(0)):
+    """Кадр из видео (снимается в окне просмотра) становится отдельным референсом с тегами видео."""
+    from PIL import Image
+    conn = db.connect()
+    r = conn.execute("SELECT * FROM media WHERE id = ?", (mid,)).fetchone()
+    if not r or r["type"] != "video":
+        raise HTTPException(404)
+    folder = conn.execute("SELECT * FROM folders WHERE id = ?", (r["folder_id"],)).fetchone()
+    data = file.file.read()
+    try:
+        fmt = Image.open(io.BytesIO(data)).format
+    except Exception:
+        fmt = None
+    if fmt not in ("JPEG", "PNG"):
+        raise HTTPException(400, tr("Не удалось сохранить кадр"))
+    t = max(0.0, t)
+    m, sec = divmod(t, 60)
+    stamp = f"{int(m)}:{sec:04.1f}"
+    dest = media.target_dir(folder["path"], f"{tr('Кадры')}/{r['name']}")
+    target = media.unique_path(dest, f"{r['name']} {int(m):02d}-{sec:04.1f}.{'png' if fmt == 'PNG' else 'jpg'}")
+    with open(target, "wb") as out:
+        out.write(data)
+    tags = [x["name"] for x in conn.execute(
+        "SELECT t.name FROM tags t JOIN media_tags mt ON mt.tag_id = t.id WHERE mt.media_id = ?", (mid,))]
+    new = media.register_file(conn, folder, target, "ref", tags + [tr("кадр")], f"{r['name']} · {stamp}")
+    media.thumbs.kick()
+    return {"id": new, "path": target}
 
 
 @app.get("/api/thumb/{mid}")
@@ -629,19 +667,20 @@ class BoardIn(BaseModel):
     data: dict | None = None
 
 
-def _board_preview(data: dict) -> list[str]:
-    items = [i for i in data.get("items", []) if i.get("type") in ("media", "asset")]
+def _board_preview(data: dict, known: set[int]) -> list[str]:
+    items = [i for i in data.get("items", []) if i.get("type") == "asset" or (i.get("type") == "media" and i.get("mid") in known)]
     items.sort(key=lambda i: -(i.get("w", 0) * i.get("h", 0)))
     return [i["src"] for i in items[:4] if i.get("src")]
 
 
 @app.get("/api/boards")
 def boards():
-    out = []
-    for r in db.connect().execute("SELECT * FROM boards ORDER BY updated_at DESC"):
+    out, conn = [], db.connect()
+    known = {r[0] for r in conn.execute("SELECT id FROM media")}
+    for r in conn.execute("SELECT * FROM boards ORDER BY updated_at DESC"):
         data = json.loads(r["data"])
         out.append({"id": r["id"], "name": r["name"], "updated_at": r["updated_at"],
-                    "count": len(data.get("items", [])), "preview": _board_preview(data)})
+                    "count": len(data.get("items", [])), "preview": _board_preview(data, known)})
     return out
 
 
@@ -737,4 +776,5 @@ app.include_router(organize.router)
 app.include_router(system.router)
 app.include_router(profile.router)
 app.include_router(pinterest.router)
+app.include_router(packs.router)
 app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")

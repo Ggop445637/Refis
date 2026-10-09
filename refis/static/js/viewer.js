@@ -7,6 +7,7 @@ const V = {
   src: null, id: null, open: false,
   mirror: false, gray: false, blur: false, grid: 0, rot: 0, loop: true,
   scale: 1, x: 0, y: 0, natW: 1, natH: 1, box: null, media: null,
+  ab: null, // повтор отрезка видео { a, b } — запоминается для каждого видео
 };
 const root = $("#viewer");
 const stage = $("#vStage");
@@ -78,6 +79,7 @@ function show(fromEl, dir) {
   $("#vTitle").innerHTML = `<span>${idx + 1} / ${total}</span><b>${esc(it.name || "")}</b>${it.tags?.length ? `<span>${esc(it.tags.join(" · "))}</span>` : ""}`;
   $('[data-act="fav"]').textContent = it.favorite ? "♥" : "♡";
   $('[data-act="trash"]').hidden = !!it.external || !V.src.onTrash;
+  V.ab = it.type === "video" && !it.external ? (store("ab") || {})[it.id] || null : null;
   syncButtons();
   if (!it.external) api(`/media/${it.id}/viewed`, { method: "POST" }).catch(() => {});
 
@@ -239,6 +241,10 @@ function syncButtons() {
   $('[data-act="grid"]').textContent = V.grid ? `# ${V.grid}×${V.grid}` : "#";
   $('[data-act="rotate"]').classList.toggle("on", !!V.rot);
   $('[data-act="loop"]').classList.toggle("on", V.loop);
+  const ab = $('[data-act="ab"]');
+  ab.classList.toggle("on", !!V.ab);
+  ab.textContent = V.ab?.b != null ? "A–B ✓" : V.ab ? "A…" : "A–B";
+  renderAB();
 }
 $("#pickBtn").hidden = !("EyeDropper" in window);
 
@@ -267,7 +273,9 @@ async function act(a) {
     case "loop": V.loop = !V.loop; if (v) v.loop = V.loop; break;
     case "back": if (v) { v.pause(); v.currentTime = Math.max(0, v.currentTime - 1 / 30); } break;
     case "fwd": if (v) { v.pause(); v.currentTime += 1 / 30; } break;
-    case "copy": if (it.type === "image") copyImage(fullSrc(it)); else toast(tr("Копировать можно только картинки")); break;
+    case "copy": if (it.type === "image") copyImage(fullSrc(it)); else if (v) copyFrame(v); break;
+    case "ab": if (v) setAB(v, it); break;
+    case "frame": if (v && !it.external) await saveFrame(v, it).catch(() => {}); break; // ошибку уже показал api()
     case "pick": {
       if (!("EyeDropper" in window)) return;
       try {
@@ -379,11 +387,91 @@ function bindVideoBar(v) {
     mute.textContent = v.muted ? "🔇" : "🔊";
   };
   ["timeupdate", "play", "pause", "loadedmetadata", "volumechange", "seeked"].forEach((ev) => v.addEventListener(ev, upd));
+  v.addEventListener("loadedmetadata", renderAB);
+  // повтор отрезка: timeupdate приходит редко, поэтому проверяем каждый кадр
+  const tick = () => {
+    if (V.media !== v || !V.open) return;
+    if (V.ab?.b != null && (v.currentTime >= V.ab.b || v.ended)) {
+      v.currentTime = V.ab.a;
+      if (v.paused && v.ended) v.play();
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
   seek.oninput = () => { if (v.duration) v.currentTime = (seek.value / 1000) * v.duration; };
   play.onclick = () => (v.paused ? v.play() : v.pause());
   mute.onclick = () => { v.muted = !v.muted; store("muted", v.muted); };
   upd();
 }
+// ---------- отрезок A–B и кадры
+
+function setAB(v, it) {
+  const t = v.currentTime;
+  if (!V.ab) {
+    V.ab = { a: t, b: null };
+    toast(`A — ${fmtT(t)}. ${tr("Нажмите X ещё раз в конце отрезка")}`, { life: 2500 });
+  } else if (V.ab.b == null) {
+    if (Math.abs(t - V.ab.a) < 0.2) return toast(tr("Отрезок слишком короткий"), { life: 1500 });
+    V.ab = { a: Math.min(V.ab.a, t), b: Math.max(V.ab.a, t) };
+    v.currentTime = V.ab.a;
+    v.play();
+    toast(`${tr("Повтор отрезка")} ${fmtT(V.ab.a)} – ${fmtT(V.ab.b)}`, { life: 2500 });
+  } else {
+    V.ab = null;
+    toast(tr("Повтор отрезка выключен"), { life: 1500 });
+  }
+  const all = store("ab") || {};
+  if (V.ab?.b != null) all[it.id] = V.ab; else delete all[it.id];
+  const keys = Object.keys(all);
+  keys.slice(0, Math.max(0, keys.length - 300)).forEach((k) => delete all[k]);
+  store("ab", all);
+  syncButtons();
+}
+
+function renderAB() {
+  const el = $("#vAB"), v = V.media?.tagName === "VIDEO" ? V.media : null;
+  if (!V.ab || !v?.duration) { el.hidden = true; return; }
+  const a = V.ab.a / v.duration, b = (V.ab.b ?? V.ab.a) / v.duration;
+  el.hidden = false;
+  el.style.left = `${a * 100}%`;
+  el.style.width = `${(b - a) * 100}%`;
+}
+
+function frameCanvas(v) {
+  const c = document.createElement("canvas");
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext("2d").drawImage(v, 0, 0);
+  return c;
+}
+
+async function copyFrame(v) {
+  if (!v.videoWidth) return;
+  try {
+    const png = await new Promise((r) => frameCanvas(v).toBlob(r, "image/png"));
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+    toast(tr("Кадр скопирован — вставьте его в редактор (Ctrl+V)"));
+  } catch {
+    toast(tr("Не удалось скопировать картинку"), { error: true });
+  }
+}
+
+async function saveFrame(v, it) {
+  if (!v.videoWidth) return toast(tr("Видео ещё не загрузилось"));
+  v.pause();
+  const t = v.currentTime;
+  const blob = await new Promise((r) => frameCanvas(v).toBlob(r, "image/jpeg", 0.95));
+  const fd = new FormData();
+  fd.append("file", blob, "frame.jpg");
+  fd.append("t", String(t));
+  const r = await api(`/media/${it.id}/frame`, { method: "POST", body: fd });
+  V.box?.classList.remove("flash");
+  void V.box?.offsetWidth;
+  V.box?.classList.add("flash");
+  toast(`📷 ${tr("Кадр сохранён в библиотеку")} — ${fmtT(t)}`, {
+    action: tr("Показать в проводнике"), life: 5000, onAction: () => api(`/media/${r.id}/reveal`, { method: "POST" }) });
+  V.src.onAdded?.(r.id);
+}
+
 function fmtT(s) {
   if (!isFinite(s)) return "0:00.0";
   const m = Math.floor(s / 60);
@@ -420,6 +508,7 @@ export function viewerKey(e) {
     h: "mirror", "р": "mirror", g: "gray", "п": "gray", b: "blur", "и": "blur", s: "grid", "ы": "grid",
     r: "rotate", "к": "rotate", f: "fav", "а": "fav", "0": "fit", l: "loop", "д": "loop",
     ",": "back", "б": "back", ".": "fwd", "ю": "fwd", i: "pick", "ш": "pick", Delete: "trash",
+    x: "ab", "ч": "ab", k: "frame", "л": "frame",
   };
   if (map[k]) { act(map[k]); return true; }
   return true; // просмотр модальный — остальные клавиши не уходят в сетку
